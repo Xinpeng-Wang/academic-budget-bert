@@ -29,7 +29,7 @@ import torch.distributed as dist
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.sampler import RandomSampler
-
+import pdb
 logger = logging.getLogger(__name__)
 
 
@@ -277,10 +277,10 @@ class PreTrainingDataset(BertDatasetProviderInterface):
         return self.dataset_files[file_index % self.num_files]
 
     def _get_shard_file_index(self, shard_index, global_rank):
+        global_rank = 0
         if dist.is_initialized() and self.world_size > self.num_files:
             remainder = self.world_size % self.num_files
             file_index = (shard_index * self.world_size) + global_rank + (remainder * shard_index)
         else:
-            file_index = shard_index * self.world_size + global_rank
-
+            file_index = shard_index #* self.world_size + global_rank
         return file_index % self.num_files
