@@ -1,10 +1,9 @@
-# hyperparameters:
-#   param1: [val1, val2]
-#   param2: [val1, val2]
+hyperparameters:
+  model_type: [bert-mlm]
+  tokenizer_name: [bert-base-uncased] 
 
 default_parameters:
-  model_type: bert-mlm
-  tokenizer_name: bert-base-uncased 
+
   hidden_act: gelu 
   hidden_size: 768 
   num_hidden_layers: 12 
@@ -29,15 +28,15 @@ default_parameters:
   early_exit_time_marker: 32.0 
   dataset_path: ~/data/budget/masked 
   output_dir: training-out 
-  print_steps: 100
+  print_steps: 100  
   num_epochs_between_checkpoints: 10000
-  job_name: pretraining_experiment
-  project_name: budget-bert-pretraining
+  job_name: pretraining_experiment  
+  project_name: budget-bert-pretraining  
   validation_epochs: 3 
   validation_epochs_begin: 1 
-  validation_epochs_end: 1
+  validation_epochs_end: 1  
   validation_begin_proportion: 0.05 
-  validation_end_proportion: 0.01
+  validation_end_proportion: 0.01  
   validation_micro_batch: 16 
   deepspeed: True
   data_loader_type: dist 
