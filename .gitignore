@@ -7,3 +7,4 @@ slurm/
 
 runs/
 wandb/
+models/
