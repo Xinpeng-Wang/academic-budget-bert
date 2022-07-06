@@ -5,3 +5,5 @@ script/
 .vscode/
 slurm/
 
+runs/
+wandb/
