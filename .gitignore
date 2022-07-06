@@ -1,4 +1,7 @@
 *.pyc
+
 training-out/
 script/
 .vscode/
+slurm/
+
