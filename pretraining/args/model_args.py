@@ -122,3 +122,7 @@ class ModelConfigArguments:
             "choices": ["pytorch", "apex", "rms_norm"],
         },
     )
+
+    hugging_face: Optional[bool] = field(
+        default=False, metadata={"help": "if the model is a pre-defined huggingface model"}
+    )

@@ -9,12 +9,16 @@ class DistillationArguments:
 
     _argument_group_name = "Distillation Arguments"
 
-    distllation: Optional[bool] = field(
+    distillation: Optional[bool] = field(
         default=False, metadata={"help": "whether to do distillation"}
     )
 
     fearture_learn: Optional[str] = field(
         default=None, metadata={"help": "which feature distillation method to use"}
+    )
+
+    teacher_path: Optional[str] = field(
+        default=None, metadata={"help": "the path of the teacher model"}
     )
 
     
