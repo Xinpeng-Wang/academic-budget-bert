@@ -43,7 +43,7 @@ from pretraining.utils import (
     master_process,
     set_seeds,
 )
-from pretraining.modeling import BertModel
+from pretraining.modeling import BertModel, BertLMHeadModel
 from timeit import default_timer as get_now
 
 import deepspeed
@@ -184,6 +184,7 @@ def train(
             batch = pretrain_dataset_provider.get_batch(batch_index)
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
 
+            teacher_loss = teacher(batch)
             total_loss = model.forward(batch)
 
             unscaled_loss = total_loss.item()
@@ -461,7 +462,7 @@ def prepare_model_and_optimizer(args):
     return model, optimizer, lr_scheduler
 
 def prepare_distillation_optimizer(args):
-    teacher = BertModel.from_pretrained(args.teacher_path)
+    teacher = BertLMHeadModel.from_pretrained(args.teacher_path, args=None)
     teacher = deepspeed.init_inference(teacher, dtype=torch.float16)
      # Load Pre-training Model skeleton + supplied model config
     student = BasePretrainModel(args)
