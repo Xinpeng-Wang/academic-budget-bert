@@ -27,6 +27,7 @@ from pretraining.args.model_args import ModelArguments, ModelConfigArguments
 from pretraining.args.optimizer_args import OptimizerArguments
 from pretraining.args.pretraining_args import PretrainScriptParamsArguments
 from pretraining.args.scheduler_args import SchedulerArgs
+from pretraining.args.distillation_args import DistillationArguments
 from pretraining.base import BasePretrainModel
 from pretraining.dataset.distributed_pretraining_dataset import (
     PreTrainingDataset as DistPreTrainingDataset,
@@ -42,6 +43,7 @@ from pretraining.utils import (
     master_process,
     set_seeds,
 )
+from pretraining.modeling import BertModel
 from timeit import default_timer as get_now
 
 import deepspeed
@@ -145,7 +147,7 @@ def create_finetune_job(args, index, global_step, model):
 
 
 def train(
-    args, index, model, optimizer, lr_scheduler, pretrain_dataset_provider, validation_dataset=None
+    args, index, model, optimizer, lr_scheduler, pretrain_dataset_provider, validation_dataset=None, teacher=None
 ):
     global global_step
     global global_data_samples
@@ -159,6 +161,7 @@ def train(
 
     pretrain_dataset_provider.prefetch_shard(index + 1)
 
+    teacher.eval()
     model.train()
 
     all_step_time = 0.0
@@ -332,6 +335,7 @@ def get_arguments():
             OptimizerArguments,
             PretrainScriptParamsArguments,
             SchedulerArgs,
+            DistillationArguments
         )
     )
 
@@ -343,9 +347,10 @@ def get_arguments():
         optimizer_args,
         train_args,
         schedule_args,
+        distill_args
     ) = parser.parse_args_into_dataclasses()
 
-    args = merge_args([ds_args, model_args, dataset_args, train_args])
+    args = merge_args([ds_args, model_args, dataset_args, train_args, distill_args])
     args.model_config = vars(model_config_args)
     args.optimizer_args = optimizer_args
     args.schedule_args = schedule_args
@@ -455,6 +460,40 @@ def prepare_model_and_optimizer(args):
 
     return model, optimizer, lr_scheduler
 
+def prepare_distillation_optimizer(args):
+    teacher = BertModel.from_pretrained(args.teacher_path)
+    teacher = deepspeed.init_inference(teacher, dtype=torch.float16)
+     # Load Pre-training Model skeleton + supplied model config
+    student = BasePretrainModel(args)
+
+    # Optimizer parameters
+    optimizer_grouped_parameters = student.prepare_optimizer_parameters(
+        args.optimizer_args.weight_decay
+    )
+    optimizer = get_optimizer(args.optimizer_args, args.lr, optimizer_grouped_parameters)
+    lr_scheduler = get_scheduler(args.schedule_args, optimizer, args)
+
+    # DeepSpeed initializer handles FP16, distributed, optimizer automatically.
+    student.network, optimizer, _, lr_scheduler = deepspeed.initialize(
+        args=args,
+        model=student.network,
+        model_parameters=optimizer_grouped_parameters,
+        optimizer=optimizer,
+        lr_scheduler=lr_scheduler,
+        config_params=args.ds_config,
+    )
+    logger.info(f"optimizer type: {type(optimizer)}")
+    logger.info(f"optimizer description: {optimizer}")
+
+    # Overwrite application configs with DeepSpeed config
+    args.train_micro_batch_size_per_gpu = student.network.train_micro_batch_size_per_gpu()
+    args.gradient_accumulation_steps = student.network.gradient_accumulation_steps()
+
+    # Set DeepSpeed info
+    args.local_rank = student.network.local_rank
+    args.device = student.network.device
+    args.fp16 = student.network.fp16_enabled()
+    return teacher, student, optimizer, lr_scheduler
 
 def check_if_early_stop(eval_loss, scale_counter, args):
     # check if the validation loss is already NaN and stop
@@ -496,7 +535,7 @@ def load_datasets(args):
     return train_ds, valid_ds
 
 
-def start_training(args, model, optimizer, lr_scheduler, start_epoch):
+def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=None):
     """Training loop (epochs, and detect points of exit)"""
     global global_step
     global global_data_samples
@@ -517,6 +556,7 @@ def start_training(args, model, optimizer, lr_scheduler, start_epoch):
             lr_scheduler,
             pretrain_dataset_provider,
             validation_dataset,
+            teacher
         )
 
         post = time.time()
@@ -685,7 +725,11 @@ def main():
     start_time = time.time()
     args = parse_arguments()
     args.exp_start_marker = get_now()
-    model, optimizer, lr_scheduler = prepare_model_and_optimizer(args)
+    teacher_model=None
+    if not args.distillation:
+        model, optimizer, lr_scheduler = prepare_model_and_optimizer(args)
+    else:
+        teacher_model, model, optimizer, lr_scheduler = prepare_distillation_optimizer(args)
 
     start_epoch = 0
     wandb_run_id = None
@@ -697,7 +741,9 @@ def main():
     # setup W&B logging
     setup_wandb(args, model.network, resume_id=wandb_run_id)
 
-    start_training(args, model, optimizer, lr_scheduler, start_epoch)
+
+    start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher_model)
+
 
     end_time = time.time() - start_time
     logger.info(f"Training time: {end_time} seconds")
