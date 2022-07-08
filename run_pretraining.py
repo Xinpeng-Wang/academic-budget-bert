@@ -462,7 +462,7 @@ def prepare_model_and_optimizer(args):
     return model, optimizer, lr_scheduler
 
 def prepare_distillation_optimizer(args):
-    teacher = BertLMHeadModel.from_pretrained(args.teacher_path, args=None)
+    teacher = BertLMHeadModel.from_pretrained_customized(args.teacher_path, args=None)
     teacher = deepspeed.init_inference(teacher, dtype=torch.float16)
      # Load Pre-training Model skeleton + supplied model config
     student = BasePretrainModel(args)

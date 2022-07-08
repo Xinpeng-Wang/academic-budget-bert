@@ -704,7 +704,7 @@ class BertPreTrainedModel(PreTrainedModel):
             module.bias.data.zero_()
     
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *inputs, **kwargs):
+    def from_pretrained_customized(cls, pretrained_model_name_or_path, *inputs, **kwargs):
         """
         Instantiate a BertPreTrainedModel from a pre-trained model file or a pytorch state dict.
         Download and cache the pre-trained model file if needed.
