@@ -120,16 +120,24 @@ def change_state_dict(state_dict):
     old_keys = []
     new_keys = []
     for key in state_dict.keys():
-        if 'bert.' in key:
-            new_key = key[5:]
-            if 'attention.output.LayerNorm' in new_key:
-                new_key = new_key.replace('attention.output.LayerNorm', 'PreAttentionLayerNorm')
-            if 'intermediate' in new_key:
-                new_key = new_key.replace('dense', 'dense_act.dense')
-            if 'output.LayerNorm' in new_key:
-                new_key = new_key.replace('output.LayerNorm', 'PostAttentionLayerNorm')
-            if 'pooler' in new_key:
-                new_key = new_key.replace('dense', 'dense_act.dense')
+        if 'attention.output.LayerNorm' in key:
+            new_key = key.replace('attention.output.LayerNorm', 'PreAttentionLayerNorm')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'intermediate' in key:
+            new_key = key.replace('dense', 'dense_act.dense')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'output.LayerNorm' in key:
+            new_key = key.replace('output.LayerNorm', 'PostAttentionLayerNorm')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'pooler' in key:
+            new_key = key.replace('dense', 'dense_act.dense')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'transform' in key:
+            new_key = key.replace('dense', 'dense_act.dense')
             new_keys.append(new_key)
             old_keys.append(key)
         # elif 'bert.bert' not in key and 'bert' in key:
