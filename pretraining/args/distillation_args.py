@@ -1,3 +1,4 @@
+from csv import field_size_limit
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -21,4 +22,7 @@ class DistillationArguments:
         default=None, metadata={"help": "the path of the teacher model"}
     )
 
-    
+    layer_selection: Optional[lambda s: [int(item) for item in s.split(',')]] = field(
+        default=None,
+        metadata={"help": "the layer of teacher model to learn from" }
+    )
