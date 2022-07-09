@@ -56,6 +56,8 @@ from torch.utils.data.sampler import RandomSampler
 from tqdm import tqdm
 from transformers import HfArgumentParser
 
+from methods.feature_distill import att_val_kl
+
 logger = Logger(cuda=torch.cuda.is_available())
 
 _has_wandb = False
@@ -189,7 +191,10 @@ def train(
             mlm_loss_st, attentions_st, values_st, prediction_score_st = \
                 model.forward(batch, output_attentions=True, output_values=True)
 
-            
+            loss_att, loss_val = \
+                att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
+
+            total_loss = loss_att + loss_val
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
 
