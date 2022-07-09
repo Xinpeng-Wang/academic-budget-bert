@@ -1076,7 +1076,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         self.cls = BertOnlyMLMHead(config, self.bert.embeddings.word_embeddings.weight)
         self.init_weights()
 
-    def forward(self, batch, output_attentions=False, output_values=False):
+    def forward(self, batch, output_attentions=False, output_values=False, output_loss=True):
         input_ids = batch[1]
         token_type_ids = batch[3]
         attention_mask = batch[2]
@@ -1098,20 +1098,22 @@ class BertLMHeadModel(BertPreTrainedModel):
             prediction_scores = self.cls(sequence_output)
             return prediction_scores
 
-        else: 
+        else:
+            outputs = () 
             masked_token_indexes = torch.nonzero((masked_lm_labels + 1).view(-1), as_tuple=False).view(
             -1
         )
             prediction_scores = self.cls(sequence_output, masked_token_indexes)
-            loss_fct = CrossEntropyLoss(ignore_index=-1)
-            target = torch.index_select(masked_lm_labels.view(-1), 0, masked_token_indexes)
-            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), target)
-
-            outputs = (masked_lm_loss,)
+            if output_loss:
+                loss_fct = CrossEntropyLoss(ignore_index=-1)
+                target = torch.index_select(masked_lm_labels.view(-1), 0, masked_token_indexes)
+                masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), target)
+                outputs += (masked_lm_loss,)
             if output_attentions:
                 outputs += (bert_output[1],)
             if output_values:
                 outputs += (bert_output[2],)
+            outputs += (prediction_scores,)
             return outputs
 
 
