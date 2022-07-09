@@ -337,7 +337,7 @@ class BertSelfAttention(nn.Module):
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
-        return context_layer, attention_probs
+        return context_layer, attention_probs, value_layer
 
 
 class BertSelfOutput(nn.Module):
@@ -360,11 +360,12 @@ class BertAttention(nn.Module):
         self.output = BertSelfOutput(config)
 
     def forward(self, input_tensor, attention_mask):
-        context_layer, attention_probs = self.self(input_tensor, attention_mask)
+        context_layer, attention_probs, value = self.self(input_tensor, attention_mask)
         attention_output = self.output(context_layer, input_tensor)
         output = (
             attention_output,
             attention_probs,
+            value
         )
         return output
 
@@ -429,7 +430,7 @@ class BertLayer(nn.Module):
             )
             self_attn_out = self.attention(pre_attn_input, attention_mask)
 
-            attention_output, attention_probs = self_attn_out
+            attention_output, attention_probs, value = self_attn_out
             attention_output = attention_output * 1 / keep_prob
 
             intermediate_input = hidden_states + attention_output
@@ -456,6 +457,7 @@ class BertLayer(nn.Module):
         output = (
             layer_output,
             attention_probs,
+            value
         )
         return output
 
@@ -522,6 +524,7 @@ class BertEncoder(nn.Module):
         output_all_encoded_layers=True,
         checkpoint_activations=False,
         output_attentions=False,
+        output_values=False
     ):
         all_encoder_layers = []
         all_attentions = []
@@ -556,7 +559,7 @@ class BertEncoder(nn.Module):
                         hidden_states,
                         attention_mask,
                     )
-                    hidden_states, attention_probs = layer_out
+                    hidden_states, attention_probs, value = layer_out
                     # get all attention_probs from layers
                     if output_attentions:
                         all_attentions = self.add_attention(all_attentions, attention_probs)
@@ -572,6 +575,8 @@ class BertEncoder(nn.Module):
         outputs = (all_encoder_layers,)
         if output_attentions:
             outputs += (all_attentions,)
+        if output_values:
+            outputs += (value,)
         return outputs
 
 
@@ -633,6 +638,9 @@ class BertLMPredictionHead(nn.Module):
                 ]
         hidden_states = self.transform(hidden_states)
         hidden_states = self.decoder(hidden_states)
+
+        #FIXME: 这里没有给没有masked_token_indexes的情况，
+        # 如果self.sparse_predict=False, masked_token_indexes=None, will crash.
         if not self.sparse_predict:
             hidden_states = torch.index_select(
                 hidden_states.view(-1, hidden_states.shape[-1]), 0, masked_token_indexes
@@ -871,6 +879,7 @@ class BertModel(BertPreTrainedModel):
         output_all_encoded_layers=True,
         checkpoint_activations=False,
         output_attentions=False,
+        output_values=False
     ):
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids)
@@ -903,6 +912,7 @@ class BertModel(BertPreTrainedModel):
             output_all_encoded_layers=output_all_encoded_layers,
             checkpoint_activations=checkpoint_activations,
             output_attentions=output_attentions,
+            output_values=output_values
         )
         encoded_layers = encoder_output[0]
         sequence_output = encoded_layers[-1]
@@ -916,7 +926,9 @@ class BertModel(BertPreTrainedModel):
             pooled_output,
         )
         if output_attentions:
-            output += (encoder_output[-1],)
+            output += (encoder_output[1],)
+        if output_values:
+            output += (encoder_output[2],)
         return output
 
 
@@ -1064,7 +1076,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         self.cls = BertOnlyMLMHead(config, self.bert.embeddings.word_embeddings.weight)
         self.init_weights()
 
-    def forward(self, batch, output_attentions=False):
+    def forward(self, batch, output_attentions=False, output_values=False):
         input_ids = batch[1]
         token_type_ids = batch[3]
         attention_mask = batch[2]
@@ -1077,6 +1089,8 @@ class BertLMHeadModel(BertPreTrainedModel):
             attention_mask,
             output_all_encoded_layers=False,
             checkpoint_activations=checkpoint_activations,
+            output_attentions = output_attentions,
+            output_values = output_values
         )
         sequence_output = bert_output[0]
 
@@ -1096,9 +1110,12 @@ class BertLMHeadModel(BertPreTrainedModel):
 
             outputs = (masked_lm_loss,)
             if output_attentions:
-                outputs += (bert_output[-1],)
+                outputs += (bert_output[1],)
+            if output_values:
+                outputs += (bert_output[2],)
             return outputs
         else:
+            #FIXME: will never get to this line. If masked_lm_labes is None, it will return earlier before.
             return prediction_scores
 
 
