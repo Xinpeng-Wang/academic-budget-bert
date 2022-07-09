@@ -3,7 +3,7 @@ import math
 import torch
 
 def att_val_kl(student_atts, student_vals, teacher_atts, teacher_vals, layer_selection):
-
+    #TODO: 把这个fp16 32， 正规化，以及看amp方案
     loss_att = 0.
     loss_value = 0.
 
