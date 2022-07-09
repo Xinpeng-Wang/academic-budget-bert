@@ -8,3 +8,5 @@ slurm/
 runs/
 wandb/
 models/
+
+tests/
