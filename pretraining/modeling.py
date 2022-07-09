@@ -1098,12 +1098,11 @@ class BertLMHeadModel(BertPreTrainedModel):
             prediction_scores = self.cls(sequence_output)
             return prediction_scores
 
-        masked_token_indexes = torch.nonzero((masked_lm_labels + 1).view(-1), as_tuple=False).view(
+        else: 
+            masked_token_indexes = torch.nonzero((masked_lm_labels + 1).view(-1), as_tuple=False).view(
             -1
         )
-        prediction_scores = self.cls(sequence_output, masked_token_indexes)
-
-        if masked_lm_labels is not None:
+            prediction_scores = self.cls(sequence_output, masked_token_indexes)
             loss_fct = CrossEntropyLoss(ignore_index=-1)
             target = torch.index_select(masked_lm_labels.view(-1), 0, masked_token_indexes)
             masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), target)
@@ -1114,9 +1113,7 @@ class BertLMHeadModel(BertPreTrainedModel):
             if output_values:
                 outputs += (bert_output[2],)
             return outputs
-        else:
-            #FIXME: will never get to this line. If masked_lm_labes is None, it will return earlier before.
-            return prediction_scores
+
 
 
 class BertForNextSentencePrediction(BertPreTrainedModel):
