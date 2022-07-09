@@ -327,17 +327,17 @@ class BertSelfAttention(nn.Module):
         attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
-        attention_probs = self.softmax(attention_scores)
+        attention_probs_before_dropout = self.softmax(attention_scores)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
-        attention_probs = self.dropout(attention_probs)
+        attention_probs = self.dropout(attention_probs_before_dropout)
 
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
-        return context_layer, attention_probs, value_layer
+        return context_layer, attention_probs_before_dropout, value_layer
 
 
 class BertSelfOutput(nn.Module):
@@ -517,6 +517,13 @@ class BertEncoder(nn.Module):
 
         return all_attentions
 
+
+    def add_value(self, all_values, value):
+        if value is not None:
+            all_values.append(value)
+
+        return all_values
+
     def forward(
         self,
         hidden_states,
@@ -528,6 +535,7 @@ class BertEncoder(nn.Module):
     ):
         all_encoder_layers = []
         all_attentions = []
+        all_values = []
 
         def custom(start, end):
             def custom_forward(*inputs):
@@ -563,6 +571,8 @@ class BertEncoder(nn.Module):
                     # get all attention_probs from layers
                     if output_attentions:
                         all_attentions = self.add_attention(all_attentions, attention_probs)
+                    if output_values:
+                        all_values = self.add_value(all_values, value)
 
                 if output_all_encoded_layers:
                     all_encoder_layers.append(hidden_states)
@@ -576,7 +586,7 @@ class BertEncoder(nn.Module):
         if output_attentions:
             outputs += (all_attentions,)
         if output_values:
-            outputs += (value,)
+            outputs += (all_values,)
         return outputs
 
 
@@ -1092,6 +1102,7 @@ class BertLMHeadModel(BertPreTrainedModel):
             output_attentions = output_attentions,
             output_values = output_values
         )
+        ### bert_output = (sequence_output, pooled_output, attention, value)
         sequence_output = bert_output[0]
 
         if masked_lm_labels is None:
@@ -1110,9 +1121,9 @@ class BertLMHeadModel(BertPreTrainedModel):
                 masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), target)
                 outputs += (masked_lm_loss,)
             if output_attentions:
-                outputs += (bert_output[1],)
-            if output_values:
                 outputs += (bert_output[2],)
+            if output_values:
+                outputs += (bert_output[3],)
             outputs += (prediction_scores,)
             return outputs
 
