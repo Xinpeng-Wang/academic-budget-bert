@@ -76,9 +76,9 @@ class BasePretrainModel(object):
         self.config = config
         self.network = model_cls(self.config, self.args, **model_kwargs)
 
-    def forward(self, batch):
-        outputs = self.network(batch)
-        return outputs[0]  # return train=loss or infer=prediction scores
+    def forward(self, batch, output_attentions=False, output_values=False, output_loss=True):
+        outputs = self.network(batch, output_attentions, output_values, output_loss)
+        return outputs   # return train=loss or infer=prediction scores
 
     @staticmethod
     def _init_vocab_size(config):

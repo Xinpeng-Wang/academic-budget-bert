@@ -110,3 +110,41 @@ def set_seeds(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+
+
+
+
+def change_state_dict(state_dict):
+    old_keys = []
+    new_keys = []
+    for key in state_dict.keys():
+        if 'attention.output.LayerNorm' in key:
+            new_key = key.replace('attention.output.LayerNorm', 'PreAttentionLayerNorm')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'intermediate' in key:
+            new_key = key.replace('dense', 'dense_act.dense')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'output.LayerNorm' in key:
+            new_key = key.replace('output.LayerNorm', 'PostAttentionLayerNorm')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'pooler' in key:
+            new_key = key.replace('dense', 'dense_act.dense')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        elif 'transform' in key:
+            new_key = key.replace('dense', 'dense_act.dense')
+            new_keys.append(new_key)
+            old_keys.append(key)
+        # elif 'bert.bert' not in key and 'bert' in key:
+        #     new_key = key[5:]
+        #     new_keys.append(new_key)
+        #     old_keys.append(key)
+            
+    for old_key, new_key in zip(old_keys, new_keys):
+        state_dict[new_key] = state_dict.pop(old_key)
+    return state_dict
