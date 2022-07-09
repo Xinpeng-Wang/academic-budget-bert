@@ -161,7 +161,6 @@ def train(
 
     pretrain_dataset_provider.prefetch_shard(index + 1)
 
-    teacher.eval()
     model.train()
 
     all_step_time = 0.0
@@ -184,9 +183,13 @@ def train(
             batch = pretrain_dataset_provider.get_batch(batch_index)
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
 
-            teacher_mlm_loss, attentions, values = teacher(batch, output_attentions=True, output_values=True)
-            student_mlm_loss, attentions, values = model.forward(batch, output_attentions=True, output_values=True)
+            with torch.no_grad():
+                attentions_teacher, values_teacher, prediction_score_teacher = \
+                    teacher(batch, output_attentions=True, output_values=True, output_loss=False)
+            mlm_loss_st, attentions_st, values_st, prediction_score_st = \
+                model.forward(batch, output_attentions=True, output_values=True)
 
+            
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
 
