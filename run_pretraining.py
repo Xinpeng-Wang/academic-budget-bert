@@ -184,8 +184,8 @@ def train(
             batch = pretrain_dataset_provider.get_batch(batch_index)
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
 
-            teacher_loss = teacher(batch)
-            total_loss = model.forward(batch)
+            teacher_mlm_loss, attentions, values = teacher(batch, output_attentions=True, output_values=True)
+            student_mlm_loss, attentions, values = model.forward(batch, output_attentions=True, output_values=True)
 
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
