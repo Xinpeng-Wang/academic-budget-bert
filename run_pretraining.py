@@ -109,6 +109,7 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
     index = validation_shard_index
     validation_shard_index += 1
     model.eval()
+    teacher.eval()
     dataset = validation_dataset.get_validation_set(index)
     data_batches = get_valid_dataloader(args, dataset)
     eval_loss = 0
@@ -147,6 +148,7 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
     del data_batches
     del batch
     model.train()
+    teacher.train()
     return eval_loss
 
 
@@ -529,8 +531,8 @@ def prepare_distillation_optimizer(args):
     args.fp16 = student.network.fp16_enabled()
 
     teacher = BertLMHeadModel.from_pretrained_customized(args.teacher_path, args=None)
-
-    teacher = deepspeed.init_inference(teacher, dtype=torch.float16 if args.fp16 else torch.float32, mp_size=dist.get_world_size())
+    teacher.to(args.device)
+    # teacher = deepspeed.init_inference(teacher, dtype=torch.float16 if args.fp16 else torch.float32, mp_size=dist.get_world_size())
     return teacher, student, optimizer, lr_scheduler
 
 def check_if_early_stop(eval_loss, scale_counter, args):
@@ -795,7 +797,6 @@ def main():
 
     # setup W&B logging
     setup_wandb(args, model.network, resume_id=wandb_run_id)
-
     clearml_logger = setup_clearml(args)
 
 
