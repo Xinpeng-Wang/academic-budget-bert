@@ -62,21 +62,7 @@ from clearml import Logger as cl_logger
 import argparse
 
 
-clmlparser = argparse.ArgumentParser(add_help=False)
-clmlparser.add_argument('--clearml_run_name')
-args, _ = clmlparser.parse_known_args()
-run_name = vars(args)['clearml_run_name']
 
-# setup clearml logging
-Task.set_credentials(
-api_host="http://35.223.63.40:8008", 
-web_host="http://35.223.63.40:8080", 
-files_host="http://35.223.63.40:8081", 
-key='VJ9XKRTX42WZQG6NRFG6', 
-secret='vvugyeM2Jd7AWCkONYpZdB7f25kbwczqbClrjTh1Sei0Fpinu9')
-
-task = Task.init(project_name='master thesis/general distill', task_name=run_name)
-clearml_logger = task.get_logger()
 
 logger = Logger(cuda=torch.cuda.is_available())
 
@@ -116,7 +102,7 @@ def get_valid_dataloader(args, dataset: Dataset):
 validation_shard_index = 0
 
 
-def pretrain_validation(args, model, validation_dataset, step, teacher=None):
+def pretrain_validation(args, model, validation_dataset, step, teacher=None, clearml_logger=None):
     global validation_shard_index
 
     logger.info(f"Validation micro batch size: {args.validation_micro_batch}")
@@ -147,8 +133,8 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None):
         eval_loss += total_loss.mean().item()
         num_eval_steps += 1
     eval_loss = eval_loss / num_eval_steps
-    
-    clearml_logger.report_scalar("loss", "eval: loss", iteration=global_step ,value=eval_loss)
+    if master_process(args):
+        clearml_logger.report_scalar("loss", "eval: loss", iteration=global_step ,value=eval_loss)
 
     logger.info(f"Validation Loss for epoch/step {index + 1}/{step} is: {eval_loss}")
     if master_process(args):
@@ -180,7 +166,7 @@ def create_finetune_job(args, index, global_step, model):
 
 
 def train(
-    args, index, model, optimizer, lr_scheduler, pretrain_dataset_provider, validation_dataset=None, teacher=None
+    args, index, model, optimizer, lr_scheduler, pretrain_dataset_provider, validation_dataset=None, teacher=None, clearml_logger=None
 ):
     global global_step
     global global_data_samples
@@ -226,10 +212,10 @@ def train(
                 att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
 
             total_loss = loss_att + loss_val
-
-            clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
-            clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
-            clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
+            if master_process(args):
+                clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
+                clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
+                clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
 
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
@@ -303,7 +289,7 @@ def train(
         time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
         if should_run_validation(time_diff, args, epoch=index):
             #TODO: 增加 不 distill的情况
-            eval_loss = pretrain_validation(args, model, validation_dataset, global_step, teacher)
+            eval_loss = pretrain_validation(args, model, validation_dataset, global_step, teacher, clearml_logger)
 
     logger.info(f"Epoch {index}: check if time to save a fine-tune checkpoint")
     if (
@@ -581,7 +567,7 @@ def load_datasets(args):
     return train_ds, valid_ds
 
 
-def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=None):
+def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=None, clearml_logger=None):
     """Training loop (epochs, and detect points of exit)"""
     global global_step
     global global_data_samples
@@ -602,7 +588,8 @@ def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=No
             lr_scheduler,
             pretrain_dataset_provider,
             validation_dataset,
-            teacher
+            teacher,
+            clearml_logger
         )
 
         post = time.time()
@@ -665,7 +652,7 @@ def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=No
 
     # run a final validation check
     #TODO: 不distill 的情况
-    _ = pretrain_validation(args, model, validation_dataset, global_step, teacher)
+    _ = pretrain_validation(args, model, validation_dataset, global_step, teacher, clearml_logger)
     logger.info("Final validation results computed")
 
 
@@ -686,6 +673,21 @@ def setup_wandb(args, model, resume_id=None):
     else:
         logger.info("W&B library not installed. Using only CLI logging.")
 
+def setup_clearml(args):
+    if master_process(args):
+    # setup clearml logging
+        Task.set_credentials(
+            api_host="http://35.223.63.40:8008", 
+            web_host="http://35.223.63.40:8080", 
+            files_host="http://35.223.63.40:8081", 
+            key='VJ9XKRTX42WZQG6NRFG6', 
+            secret='vvugyeM2Jd7AWCkONYpZdB7f25kbwczqbClrjTh1Sei0Fpinu9')
+
+        task = Task.init(project_name='master thesis/general distill', task_name=f'{args.job_name}_{args.current_run_id}')
+        clearml_logger = task.get_logger()
+        return clearml_logger
+    else:
+        return None
 
 def save_training_checkpoint(
     model,
@@ -788,10 +790,11 @@ def main():
     # setup W&B logging
     setup_wandb(args, model.network, resume_id=wandb_run_id)
 
+    clearml_logger = setup_clearml(args)
 
 
 
-    start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher_model)
+    start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher_model, clearml_logger)
 
 
     end_time = time.time() - start_time
