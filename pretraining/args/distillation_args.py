@@ -22,7 +22,7 @@ class DistillationArguments:
         default=None, metadata={"help": "the path of the teacher model"}
     )
 
-    layer_selection: Optional[lambda s: [int(item) for item in s.split(',')]] = field(
-        default=None,
+    layer_selection: Optional[str] = field(
+        default='1,3,5,7,9,11',
         metadata={"help": "the layer of teacher model to learn from" }
     )

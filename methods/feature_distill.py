@@ -10,6 +10,8 @@ def att_val_kl(student_atts, student_vals, teacher_atts, teacher_vals, layer_sel
     batch_size, num_head, length, dk = student_vals[0].shape
     dk_sqrt = math.sqrt(dk)
 
+    layer_selection = [int(item) for item in layer_selection.split(',')]
+
     new_teacher_atts = [teacher_atts[i] for i in layer_selection]
 
     for student_att, teacher_att in zip(student_atts, new_teacher_atts):
