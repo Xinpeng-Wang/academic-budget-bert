@@ -57,6 +57,26 @@ from tqdm import tqdm
 from transformers import HfArgumentParser
 
 from methods.feature_distill import att_val_kl
+from clearml import Task
+from clearml import Logger as cl_logger
+import argparse
+
+
+clmlparser = argparse.ArgumentParser(add_help=False)
+clmlparser.add_argument('--clearml_run_name')
+args, _ = clmlparser.parse_known_args()
+run_name = vars(args)['clearml_run_name']
+
+# setup clearml logging
+Task.set_credentials(
+api_host="http://35.223.63.40:8008", 
+web_host="http://35.223.63.40:8080", 
+files_host="http://35.223.63.40:8081", 
+key='VJ9XKRTX42WZQG6NRFG6', 
+secret='vvugyeM2Jd7AWCkONYpZdB7f25kbwczqbClrjTh1Sei0Fpinu9')
+
+task = Task.init(project_name='master thesis/general distill', task_name=run_name)
+clearml_logger = task.get_logger()
 
 logger = Logger(cuda=torch.cuda.is_available())
 
@@ -96,7 +116,7 @@ def get_valid_dataloader(args, dataset: Dataset):
 validation_shard_index = 0
 
 
-def pretrain_validation(args, model, validation_dataset, step):
+def pretrain_validation(args, model, validation_dataset, step, teacher=None):
     global validation_shard_index
 
     logger.info(f"Validation micro batch size: {args.validation_micro_batch}")
@@ -109,7 +129,16 @@ def pretrain_validation(args, model, validation_dataset, step):
     num_eval_steps = 0
     for _, batch in enumerate(tqdm(data_batches, smoothing=1)):
         batch = tuple(t.to(args.device) for t in batch)
-        total_loss = model.forward(batch)
+
+        total_loss, attentions_st, values_st, prediction_score_st = \
+                model.forward(batch, output_attentions=True, output_values=True)
+        if teacher is not None:
+            attentions_teacher, values_teacher, prediction_score_teacher = \
+                    teacher(batch, output_attentions=True, output_values=True, output_loss=False)
+            loss_att, loss_val = \
+                att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
+            total_loss = loss_att + loss_val
+
 
         torch.cuda.synchronize()
         # using all_reduce is IMPORTANT! it ensures validation loss consistency across all threads
@@ -118,6 +147,8 @@ def pretrain_validation(args, model, validation_dataset, step):
         eval_loss += total_loss.mean().item()
         num_eval_steps += 1
     eval_loss = eval_loss / num_eval_steps
+    
+    clearml_logger.report_scalar("loss", "eval: loss", iteration=global_step ,value=eval_loss)
 
     logger.info(f"Validation Loss for epoch/step {index + 1}/{step} is: {eval_loss}")
     if master_process(args):
@@ -195,6 +226,11 @@ def train(
                 att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
 
             total_loss = loss_att + loss_val
+
+            clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
+            clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
+            clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
+
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
 
@@ -266,7 +302,8 @@ def train(
     if validation_dataset is not None and scale_counter_at_1 < args.scale_cnt_limit:
         time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
         if should_run_validation(time_diff, args, epoch=index):
-            eval_loss = pretrain_validation(args, model, validation_dataset, global_step)
+            #TODO: 增加 不 distill的情况
+            eval_loss = pretrain_validation(args, model, validation_dataset, global_step, teacher)
 
     logger.info(f"Epoch {index}: check if time to save a fine-tune checkpoint")
     if (
@@ -627,7 +664,8 @@ def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=No
     logger.info("All nodes/processes are synced, proceed to exit")
 
     # run a final validation check
-    _ = pretrain_validation(args, model, validation_dataset, global_step)
+    #TODO: 不distill 的情况
+    _ = pretrain_validation(args, model, validation_dataset, global_step, teacher)
     logger.info("Final validation results computed")
 
 
@@ -749,6 +787,8 @@ def main():
 
     # setup W&B logging
     setup_wandb(args, model.network, resume_id=wandb_run_id)
+
+
 
 
     start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher_model)
