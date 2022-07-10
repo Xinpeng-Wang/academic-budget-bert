@@ -171,6 +171,9 @@ def train(
     global global_step
     global global_data_samples
 
+    # teacher.to(args.device)
+    # teacher.half()
+    
     dataset_iterator, total_length = pretrain_dataset_provider.get_shard(index)
     current_data_sample_count = global_data_samples
 
@@ -201,12 +204,12 @@ def train(
 
             batch = pretrain_dataset_provider.get_batch(batch_index)
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
-
+            
             with torch.no_grad():
                 attentions_teacher, values_teacher, prediction_score_teacher = \
                     teacher(batch, output_attentions=True, output_values=True, output_loss=False)
-            mlm_loss_st, attentions_st, values_st, prediction_score_st = \
-                model.forward(batch, output_attentions=True, output_values=True)
+            attentions_st, values_st, prediction_score_st = \
+                model.forward(batch, output_attentions=True, output_values=True, output_loss=False)
 
             loss_att, loss_val = \
                 att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
@@ -493,8 +496,7 @@ def prepare_model_and_optimizer(args):
     return model, optimizer, lr_scheduler
 
 def prepare_distillation_optimizer(args):
-    teacher = BertLMHeadModel.from_pretrained_customized(args.teacher_path, args=None)
-    teacher = deepspeed.init_inference(teacher, dtype=torch.float16)
+
      # Load Pre-training Model skeleton + supplied model config
     student = BasePretrainModel(args)
 
@@ -525,6 +527,10 @@ def prepare_distillation_optimizer(args):
     args.local_rank = student.network.local_rank
     args.device = student.network.device
     args.fp16 = student.network.fp16_enabled()
+
+    teacher = BertLMHeadModel.from_pretrained_customized(args.teacher_path, args=None)
+
+    teacher = deepspeed.init_inference(teacher, dtype=torch.float16 if args.fp16 else torch.float32, mp_size=dist.get_world_size())
     return teacher, student, optimizer, lr_scheduler
 
 def check_if_early_stop(eval_loss, scale_counter, args):
