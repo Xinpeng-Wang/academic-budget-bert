@@ -135,7 +135,8 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
         num_eval_steps += 1
     eval_loss = eval_loss / num_eval_steps
     if master_process(args):
-        clearml_logger.report_scalar("loss", "eval: loss", iteration=global_step ,value=eval_loss)
+        # clearml_logger.report_scalar("loss", "eval: loss", iteration=global_step ,value=eval_loss)
+        wandb.log({"Validation/loss": eval_loss}, step=global_step )
 
     logger.info(f"Validation Loss for epoch/step {index + 1}/{step} is: {eval_loss}")
     if master_process(args):
@@ -221,7 +222,9 @@ def train(
             #     clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
             #     clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
             #     clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
-
+                wandb.log({"train/loss": total_loss}, step=global_step)
+                wandb.log({"train/loss_att": loss_att}, step=global_step)
+                wandb.log({"train/loss_val": loss_val}, step=global_step)
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
 
