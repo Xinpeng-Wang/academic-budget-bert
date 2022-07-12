@@ -16,6 +16,10 @@
 # limitations under the License.
 """ Finetuning the library models for sequence classification on GLUE."""
 # You can also adapt this script on your own text classification task. Pointers for this are left as comments.
+from sched import scheduler
+from pyparsing import Opt
+from torch.optim import Adam, AdamW
+from pretraining.optimizers import get_adamw
 
 import json
 import logging
@@ -46,6 +50,9 @@ from transformers import (
     TrainingArguments,
     default_data_collator,
     set_seed,
+    get_linear_schedule_with_warmup,
+    AdamW,
+    get_polynomial_decay_schedule_with_warmup
 )
 from transformers.trainer_utils import SchedulerType, is_main_process
 
@@ -161,7 +168,9 @@ class FinetuneTrainingArguments(TrainingArguments):
         default=True,
         metadata={"help": "Whether to use full 16-bit precision evaluation instead of 32-bit"},
     )
-    warmup_ratio: Optional[float] = field(default=0. , metadata={"help": "warmup ratio."})
+    warmup_ratio: Optional[float] = field(default=0. , metadata={"help": "warmup ratio."})  
+    total_steps: Optional[int] = field(default=123873, metadata={'help': "total num of update steps"})
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -477,6 +486,8 @@ def main():
     else:
         data_collator = None
 
+    optimizer = AdamW(model.parameters(), training_args.learning_rate)
+    scheduler = get_polynomial_decay_schedule_with_warmup(optimizer, training_args.warmup_steps, training_args.total_steps)
     # Initialize our Trainer
     trainer = Trainer(
         model=model,
@@ -487,6 +498,7 @@ def main():
         tokenizer=tokenizer,
         callbacks=callbacks,
         data_collator=data_collator,
+        optimizers=(optimizer, scheduler)
     )
 
     # Training
