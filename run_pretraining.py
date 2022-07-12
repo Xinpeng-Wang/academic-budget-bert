@@ -218,9 +218,9 @@ def train(
 
             total_loss = loss_att + loss_val
             if master_process(args):
-                clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
-                clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
-                clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
+            #     clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
+            #     clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
+            #     clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
 
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
@@ -797,8 +797,8 @@ def main():
 
     # setup W&B logging
     setup_wandb(args, model.network, resume_id=wandb_run_id)
-    clearml_logger = setup_clearml(args)
-
+    # clearml_logger = setup_clearml(args) 
+    clearml_logger = None
 
 
     start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher_model, clearml_logger)
