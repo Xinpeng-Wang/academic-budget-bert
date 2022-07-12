@@ -161,7 +161,7 @@ class FinetuneTrainingArguments(TrainingArguments):
         default=True,
         metadata={"help": "Whether to use full 16-bit precision evaluation instead of 32-bit"},
     )
-
+    warmup_ratio: Optional[float] = field(default=0. , metadata={"help": "warmup ratio."})
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
