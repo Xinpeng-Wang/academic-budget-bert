@@ -66,7 +66,7 @@ class BasePretrainModel(object):
             if model_name_or_path is None:
                 logger.info(f"Loading config from args")
                 config = config_cls(**args.model_config)
-                config = self._init_vocab_size(config)
+                # config = self._init_vocab_size(config)
             else:
                 config = config_cls.from_pretrained(model_name_or_path)
 
