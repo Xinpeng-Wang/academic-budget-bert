@@ -66,7 +66,7 @@ from clearml import Task
 import argparse
 
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument('--run-name')
+parser.add_argument('--run_name')
 args, _ = parser.parse_known_args()
 run_name = vars(args)['run_name']
 
