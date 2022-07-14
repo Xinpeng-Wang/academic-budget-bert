@@ -19,6 +19,7 @@
 from sched import scheduler
 from pyparsing import Opt
 from torch.optim import Adam, AdamW
+import wandb
 from pretraining.optimizers import get_adamw
 
 import json
@@ -47,6 +48,9 @@ from transformers import (
     HfArgumentParser,
     PretrainedConfig,
     Trainer,
+    TrainerCallback,
+    TrainerState,
+    TrainerControl,
     TrainingArguments,
     default_data_collator,
     set_seed,
@@ -54,7 +58,28 @@ from transformers import (
     AdamW,
     get_polynomial_decay_schedule_with_warmup
 )
+from transformers.integrations import WandbCallback
 from transformers.trainer_utils import SchedulerType, is_main_process
+
+
+from clearml import Task
+import argparse
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument('--run-name')
+args, _ = parser.parse_known_args()
+run_name = vars(args)['run_name']
+
+Task.set_credentials(
+            api_host="http://35.223.63.40:8008", 
+            web_host="http://35.223.63.40:8080", 
+            files_host="http://35.223.63.40:8081", 
+            key='VJ9XKRTX42WZQG6NRFG6', 
+            secret='vvugyeM2Jd7AWCkONYpZdB7f25kbwczqbClrjTh1Sei0Fpinu9')
+
+task = Task.init(project_name='master thesis/general distill', task_name=run_name)
+clearml_logger = task.get_logger()
+
 
 task_to_keys = {
     "cola": ("sentence", None),
@@ -70,6 +95,15 @@ task_to_keys = {
 
 logger = logging.getLogger(__name__)
 
+
+class PrinterCallback(TrainerCallback):
+    def on_step_end(self, args, state, control, optimizer, **kwargs):
+        lr = kwargs['lr_scheduler'].get_last_lr()[0]
+        step = state.global_step
+        wandb.log({"lr": lr}, step = step)
+        clearml_logger.report_scalar("train", "lr", iteration=step ,value=lr)
+        pass
+    
 
 @dataclass
 class DataTrainingArguments:
@@ -170,7 +204,6 @@ class FinetuneTrainingArguments(TrainingArguments):
     )
     warmup_ratio: Optional[float] = field(default=0. , metadata={"help": "warmup ratio."})  
     total_steps: Optional[int] = field(default=123873, metadata={'help': "total num of update steps"})
-
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -496,7 +529,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
-        callbacks=callbacks,
+        callbacks=[PrinterCallback],
         data_collator=data_collator,
         optimizers=(optimizer, scheduler)
     )
