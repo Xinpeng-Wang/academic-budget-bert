@@ -25,9 +25,8 @@ finetune_config = {
   "--evaluation_strategy": "steps",
   "--max_grad_norm": 1.0,
   "--num_train_epochs": 20,
-  "--warmup_steps": 122,
-  "--total_steps": 1560,
-  "--run_name": "test"
+  "--run_name": "test",
+  "--warmup_ratio": 0.06
 }
 
 

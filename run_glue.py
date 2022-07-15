@@ -21,6 +21,7 @@ from pyparsing import Opt
 from torch.optim import Adam, AdamW
 import wandb
 from pretraining.optimizers import get_adamw
+import math
 
 import json
 import logging
@@ -519,8 +520,11 @@ def main():
     else:
         data_collator = None
 
+    total_steps = len(train_dataset) * training_args.num_train_epochs / training_args.train_batch_size
+    rounded_steps = int(math.ceil(total_steps / 10.0)) * 10
+    warmup_steps = round(rounded_steps * training_args.warmup_ratio)
     optimizer = AdamW(model.parameters(), training_args.learning_rate)
-    scheduler = get_polynomial_decay_schedule_with_warmup(optimizer, training_args.warmup_steps, training_args.total_steps)
+    scheduler = get_polynomial_decay_schedule_with_warmup(optimizer, warmup_steps, rounded_steps)
     # Initialize our Trainer
     trainer = Trainer(
         model=model,
