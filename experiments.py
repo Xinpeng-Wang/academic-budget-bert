@@ -44,7 +44,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 def train(device, config):
 
-    cmd = f'CUDA_VISIBLE_DEVICES=0 python run_glue.py ' 
+    cmd = f'CUDA_VISIBLE_DEVICES={device} python run_glue.py ' 
     options = []
     for k, v in config.items():   
         if v is not None:
@@ -77,6 +77,10 @@ def experiment_start(task, device, batch_size, lr):
 
 
 
+num_workers = 8
+
+
+
 for task in ['rte', 'cola', 'mrpc', 'qnli', 'sst2', 'mnli', 'qqp']:
     args = []
     idx = 0
@@ -84,12 +88,9 @@ for task in ['rte', 'cola', 'mrpc', 'qnli', 'sst2', 'mnli', 'qqp']:
         for bz in [16, 32]:
             args.append((task, idx, bz, lr))
     
-    pass
 
-
-
-
-
+    writer_workers = Pool(num_workers)
+    writer_workers.starmap(experiment_start, args)
 
 
 
