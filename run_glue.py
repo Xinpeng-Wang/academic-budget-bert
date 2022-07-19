@@ -68,8 +68,10 @@ import argparse
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('--run_name')
+parser.add_argument('--log_group')
 args, _ = parser.parse_known_args()
 run_name = vars(args)['run_name']
+group = vars(args)['log_group']
 
 Task.set_credentials(
             api_host="http://35.223.63.40:8008", 
@@ -78,7 +80,7 @@ Task.set_credentials(
             key='VJ9XKRTX42WZQG6NRFG6', 
             secret='vvugyeM2Jd7AWCkONYpZdB7f25kbwczqbClrjTh1Sei0Fpinu9')
 
-task = Task.init(project_name='master thesis/general distill', task_name=run_name)
+task = Task.init(project_name=f'master thesis/{group}', task_name=run_name)
 clearml_logger = task.get_logger()
 
 
@@ -205,6 +207,7 @@ class FinetuneTrainingArguments(TrainingArguments):
     )
     warmup_ratio: Optional[float] = field(default=0. , metadata={"help": "warmup ratio."})  
     total_steps: Optional[int] = field(default=123873, metadata={'help': "total num of update steps"})
+    log_group:  Optional[str] = field(default=None, metadata={"help": "clearml group name"})
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -519,7 +522,7 @@ def main():
         data_collator = DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8)
     else:
         data_collator = None
-
+    training_args.save_strategy = "no"
     total_steps = len(train_dataset) * training_args.num_train_epochs / training_args.train_batch_size
     rounded_steps = int(math.ceil(total_steps / 10.0)) * 10
     warmup_steps = round(rounded_steps * training_args.warmup_ratio)
