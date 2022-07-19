@@ -33,7 +33,7 @@ finetune_config = {
 
 def train(device, config):
 
-    cmd = f'CUDA_VISIBLE_DEVICES=0 python run_glue.py ' 
+    cmd = f'CUDA_VISIBLE_DEVICES={device} python run_glue.py ' 
     options = []
     for k, v in config.items():   
         if v is not None:
@@ -64,12 +64,19 @@ def experiment_start(task, device, batch_size, lr):
 
 
 
-# for lr in [1e-5, 3e-5, 5e-5, 8e-5]:
-#     for bz in [16, 32]:
-#         experiment_start('mnli', None, bz, lr)
+num_workers = 8
 
-experiment_start('rte', None, 32, 3e-5)
 
+for task in ['rte', 'cola', 'mrpc', 'qnli', 'sst2', 'mnli', 'qqp']:
+    args = []
+    idx = 0
+    for lr in [1e-5, 3e-5, 5e-5, 8e-5]:
+        for bz in [16, 32]:
+            args.append((task, idx, bz, lr))
+    
+
+    writer_workers = Pool(num_workers)
+    writer_workers.starmap(experiment_start, args)
 
 
 
