@@ -106,8 +106,8 @@ class PrinterCallback(TrainerCallback):
         wandb.log({"lr": lr}, step = step)
         clearml_logger.report_scalar("train", "lr", iteration=step ,value=lr)
         pass
-    
 
+    
 @dataclass
 class DataTrainingArguments:
     """
@@ -448,6 +448,8 @@ def main():
 
     train_dataset = datasets["train"]
     eval_dataset = datasets["validation_matched" if data_args.task_name == "mnli" else "validation"]
+    if data_args.task_name == "mnli":
+        eval_dataset_mm = datasets["validation_mismatched"]
     if data_args.task_name is not None:
         test_dataset = datasets["test_matched" if data_args.task_name == "mnli" else "test"]
 
@@ -534,6 +536,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset if training_args.do_eval else None,
+        eval_dataset_2=eval_dataset_mm if data_args.task_name == "mnli" else None,
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         callbacks=[PrinterCallback],
