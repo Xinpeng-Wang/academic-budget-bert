@@ -56,7 +56,7 @@ from torch.utils.data.sampler import RandomSampler
 from tqdm import tqdm
 from transformers import HfArgumentParser
 
-from methods.feature_distill import att_val_kl
+from methods.feature_distill import att_val_kl, att_val_frame, twostage
 from clearml import Task
 from clearml import Logger as cl_logger
 import argparse
@@ -208,23 +208,18 @@ def train(
             batch = pretrain_dataset_provider.get_batch(batch_index)
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
             
-            with torch.no_grad():
-                attentions_teacher, values_teacher, prediction_score_teacher = \
-                    teacher(batch, output_attentions=True, output_values=True, output_loss=False)
-            attentions_st, values_st, prediction_score_st = \
-                model.forward(batch, output_attentions=True, output_values=True, output_loss=False)
+            if args.method == 'att_val_og':
+                loss_att, loss_val = att_val_frame(teacher, model, args, batch)
+                total_loss = loss_att + loss_val
+                if master_process(args):
+                    wandb.log({"train/loss": total_loss}, step=global_step)
+                    wandb.log({"train/loss_att": loss_att}, step=global_step)
+                    wandb.log({"train/loss_val": loss_val}, step=global_step)
+            if args.method == 'att_val_two_stage':
+                time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
+                total_loss = twostage(teacher, model, args, batch, time_diff, global_step, wandb)
+            
 
-            loss_att, loss_val = \
-                att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
-
-            total_loss = loss_att + loss_val
-            if master_process(args):
-            #     clearml_logger.report_scalar("loss", "loss", iteration=global_step ,value=total_loss)
-            #     clearml_logger.report_scalar("loss", "loss_att", iteration=global_step ,value=loss_att)
-            #     clearml_logger.report_scalar("loss", "loss_val", iteration=global_step ,value=loss_val)
-                wandb.log({"train/loss": total_loss}, step=global_step)
-                wandb.log({"train/loss_att": loss_att}, step=global_step)
-                wandb.log({"train/loss_val": loss_val}, step=global_step)
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
 
