@@ -26,3 +26,8 @@ class DistillationArguments:
         default='1,3,5,7,9,11',
         metadata={"help": "the layer of teacher model to learn from" }
     )
+
+    method: Optional[str] = field(
+        default=None,
+        metadata={"help":"distillation method to use"}
+    )
