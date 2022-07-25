@@ -337,7 +337,7 @@ class BertSelfAttention(nn.Module):
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
-        return context_layer, attention_scores, value_layer
+        return context_layer, attention_scores, (query_layer, key_layer, value_layer)
 
 
 class BertSelfOutput(nn.Module):
@@ -360,12 +360,12 @@ class BertAttention(nn.Module):
         self.output = BertSelfOutput(config)
 
     def forward(self, input_tensor, attention_mask):
-        context_layer, attention_probs, value = self.self(input_tensor, attention_mask)
+        context_layer, attention_probs, qkv = self.self(input_tensor, attention_mask)
         attention_output = self.output(context_layer, input_tensor)
         output = (
             attention_output,
             attention_probs,
-            value
+            qkv
         )
         return output
 
@@ -430,7 +430,7 @@ class BertLayer(nn.Module):
             )
             self_attn_out = self.attention(pre_attn_input, attention_mask)
 
-            attention_output, attention_probs, value = self_attn_out
+            attention_output, attention_probs, qkv = self_attn_out
             attention_output = attention_output * 1 / keep_prob
 
             intermediate_input = hidden_states + attention_output
@@ -457,7 +457,7 @@ class BertLayer(nn.Module):
         output = (
             layer_output,
             attention_probs,
-            value
+            qkv
         )
         return output
 
@@ -531,11 +531,11 @@ class BertEncoder(nn.Module):
         output_all_encoded_layers=True,
         checkpoint_activations=False,
         output_attentions=False,
-        output_values=False
+        output_qkv=False
     ):
         all_encoder_layers = []
         all_attentions = []
-        all_values = []
+        all_qkv = []
 
         def custom(start, end):
             def custom_forward(*inputs):
@@ -567,12 +567,12 @@ class BertEncoder(nn.Module):
                         hidden_states,
                         attention_mask,
                     )
-                    hidden_states, attention_probs, value = layer_out
+                    hidden_states, attention_probs, qkv = layer_out
                     # get all attention_probs from layers
                     if output_attentions:
                         all_attentions = self.add_attention(all_attentions, attention_probs)
-                    if output_values:
-                        all_values = self.add_value(all_values, value)
+                    if output_qkv:
+                        all_qkv = self.add_value(all_qkv, qkv)
 
                 if output_all_encoded_layers:
                     all_encoder_layers.append(hidden_states)
@@ -585,8 +585,8 @@ class BertEncoder(nn.Module):
         outputs = (all_encoder_layers,)
         if output_attentions:
             outputs += (all_attentions,)
-        if output_values:
-            outputs += (all_values,)
+        if output_qkv:
+            outputs += (all_qkv,)
         return outputs
 
 
@@ -889,7 +889,7 @@ class BertModel(BertPreTrainedModel):
         output_all_encoded_layers=True,
         checkpoint_activations=False,
         output_attentions=False,
-        output_values=False
+        output_qkv=False
     ):
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids)
@@ -922,7 +922,7 @@ class BertModel(BertPreTrainedModel):
             output_all_encoded_layers=output_all_encoded_layers,
             checkpoint_activations=checkpoint_activations,
             output_attentions=output_attentions,
-            output_values=output_values
+            output_qkv=output_qkv
         )
         encoded_layers = encoder_output[0]
         sequence_output = encoded_layers[-1]
@@ -937,7 +937,7 @@ class BertModel(BertPreTrainedModel):
         )
         if output_attentions:
             output += (encoder_output[1],)
-        if output_values:
+        if output_qkv:
             output += (encoder_output[2],)
         return output
 
@@ -1086,7 +1086,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         self.cls = BertOnlyMLMHead(config, self.bert.embeddings.word_embeddings.weight)
         self.init_weights()
 
-    def forward(self, batch, output_attentions=False, output_values=False, output_loss=True):
+    def forward(self, batch, output_attentions=False, output_qkv=False, output_loss=True):
         input_ids = batch[1]
         token_type_ids = batch[3]
         attention_mask = batch[2]
@@ -1100,7 +1100,7 @@ class BertLMHeadModel(BertPreTrainedModel):
             output_all_encoded_layers=False,
             checkpoint_activations=checkpoint_activations,
             output_attentions = output_attentions,
-            output_values = output_values
+            output_qkv = output_qkv
         )
         ### bert_output = (sequence_output, pooled_output, attention, value)
         sequence_output = bert_output[0]
@@ -1122,7 +1122,7 @@ class BertLMHeadModel(BertPreTrainedModel):
                 outputs += (masked_lm_loss,)
             if output_attentions:
                 outputs += (bert_output[2],)
-            if output_values:
+            if output_qkv:
                 outputs += (bert_output[3],)
             outputs += (prediction_scores,)
             return outputs

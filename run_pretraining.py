@@ -118,10 +118,10 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
         batch = tuple(t.to(args.device) for t in batch)
 
         total_loss, attentions_st, values_st, prediction_score_st = \
-                model.forward(batch, output_attentions=True, output_values=True)
+                model.forward(batch, output_attentions=True, output_qkv=True)
         if teacher is not None:
             attentions_teacher, values_teacher, prediction_score_teacher = \
-                    teacher(batch, output_attentions=True, output_values=True, output_loss=False)
+                    teacher(batch, output_attentions=True, output_qkv=True, output_loss=False)
             loss_att, loss_val = \
                 att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
             total_loss = loss_att + loss_val
@@ -208,17 +208,13 @@ def train(
             batch = pretrain_dataset_provider.get_batch(batch_index)
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
             
-            if args.method == 'att_val_og':
-                loss_att, loss_val = att_val_frame(teacher, model, args, batch)
-                total_loss = loss_att + loss_val
-                if master_process(args):
-                    wandb.log({"train/loss": total_loss}, step=global_step)
-                    wandb.log({"train/loss_att": loss_att}, step=global_step)
-                    wandb.log({"train/loss_val": loss_val}, step=global_step)
+            if args.method == 'att_val_og' or 'minilm_v2':
+                total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb)
+                
             if args.method == 'att_val_two_stage':
                 time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
                 total_loss = twostage(teacher, model, args, batch, time_diff, global_step, wandb)
-            
+        
 
             unscaled_loss = total_loss.item()
             current_data_sample_count += args.train_micro_batch_size_per_gpu * dist.get_world_size()
