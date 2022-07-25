@@ -31,3 +31,8 @@ class DistillationArguments:
         default=None,
         metadata={"help":"distillation method to use"}
     )
+
+    student_initialize: Optional[str] = field(
+        default=None,
+        metadata={"help": "student to initialize from"}
+    )
