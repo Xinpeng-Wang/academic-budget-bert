@@ -117,14 +117,15 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
     for _, batch in enumerate(tqdm(data_batches, smoothing=1)):
         batch = tuple(t.to(args.device) for t in batch)
 
-        total_loss, attentions_st, values_st, prediction_score_st = \
-                model.forward(batch, output_attentions=True, output_qkv=True)
+        # total_loss, attentions_st, values_st, prediction_score_st = \
+        #         model.forward(batch, output_attentions=True, output_qkv=True)
         if teacher is not None:
-            attentions_teacher, values_teacher, prediction_score_teacher = \
-                    teacher(batch, output_attentions=True, output_qkv=True, output_loss=False)
-            loss_att, loss_val = \
-                att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
-            total_loss = loss_att + loss_val
+            if args.method == 'att_val_og' or 'minilm_v2':
+                total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb)
+                
+            if args.method == 'att_val_two_stage':
+                time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
+                total_loss = twostage(teacher, model, args, batch, time_diff, global_step, wandb)
 
 
         torch.cuda.synchronize()
