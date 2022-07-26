@@ -3,6 +3,9 @@ import math
 import torch
 from pretraining.utils import master_process
 # import wandb
+from .pear_loss import Dist_att
+
+dist_att = Dist_att()
 
 def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
     #TODO: 把这个fp16 32， 正规化，以及看amp方案
@@ -103,6 +106,15 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb):
             wandb.log({"train/loss_q": loss_q}, step=global_step)
             wandb.log({"train/loss_k": loss_k}, step=global_step)
             wandb.log({"train/loss_v": loss_v}, step=global_step)
+    elif args.method == 'pear_col':
+        inter_token_1, inter_token_2, inter_head, inter_sentence = dist_att.forward(attentions_teacher[-1], attentions_st[-1])
+        total_loss = inter_token_1 + inter_token_2 + inter_head + inter_sentence
+        if master_process(args):
+            wandb.log({"train/loss": total_loss}, step=global_step)
+            wandb.log({"train/inter_token_1": inter_token_1}, step=global_step)
+            wandb.log({"train/inter_token_2": inter_token_2}, step=global_step)
+            wandb.log({"train/inter_head": inter_head}, step=global_step)
+            wandb.log({"train/inter_sentence": inter_sentence}, step=global_step)
     return total_loss
 
 
@@ -129,3 +141,5 @@ def twostage(teacher, student,args, batch, time_diff, global_step, wandb):
             wandb.log({"train/loss_att": loss_att}, step=global_step)
             wandb.log({"train/loss_val": loss_val}, step=global_step)
     return total_loss 
+
+
