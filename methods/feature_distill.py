@@ -83,7 +83,9 @@ def minilm_v2(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_select
 
     return  loss_q, loss_k, loss_v
 
-def att_val_frame(teacher, student, args, batch, global_step, wandb):
+def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False):
+    log = 'eval' if eval else 'train'
+
     with torch.no_grad():
         attentions_teacher, qkv_teacher, prediction_score_teacher = \
                 teacher(batch, output_attentions=True, output_qkv=True, output_loss=False)
@@ -94,37 +96,39 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb):
             att_val_kl(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
         total_loss = loss_att + loss_val
         if master_process(args):
-            wandb.log({"train/loss": total_loss}, step=global_step)
-            wandb.log({"train/loss_att": loss_att}, step=global_step)
-            wandb.log({"train/loss_val": loss_val}, step=global_step)
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
+            wandb.log({f"{log}/loss_val": loss_val}, step=global_step)
     elif args.method == 'minilm_v2':
         loss_q, loss_k, loss_v = \
             minilm_v2(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
-        total_loss = loss_q + loss_k + loss_v
+        total_loss = loss_q + loss_k + loss_v        
+        
         if master_process(args):
-            wandb.log({"train/loss": total_loss}, step=global_step)
-            wandb.log({"train/loss_q": loss_q}, step=global_step)
-            wandb.log({"train/loss_k": loss_k}, step=global_step)
-            wandb.log({"train/loss_v": loss_v}, step=global_step)
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_q": loss_q}, step=global_step)
+            wandb.log({f"{log}/loss_k": loss_k}, step=global_step)
+            wandb.log({f"{log}/loss_v": loss_v}, step=global_step)
     elif args.method == 'pear_col':
         inter_token_1, inter_token_2, inter_head, inter_sentence = dist_att.forward(attentions_teacher[-1], attentions_st[-1])
         total_loss = inter_token_1 + inter_token_2 + inter_head + inter_sentence
         if master_process(args):
-            wandb.log({"train/loss": total_loss}, step=global_step)
-            wandb.log({"train/inter_token_1": inter_token_1}, step=global_step)
-            wandb.log({"train/inter_token_2": inter_token_2}, step=global_step)
-            wandb.log({"train/inter_head": inter_head}, step=global_step)
-            wandb.log({"train/inter_sentence": inter_sentence}, step=global_step)
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/inter_token_1": inter_token_1}, step=global_step)
+            wandb.log({f"{log}/inter_token_2": inter_token_2}, step=global_step)
+            wandb.log({f"{log}/inter_head": inter_head}, step=global_step)
+            wandb.log({f"{log}/inter_sentence": inter_sentence}, step=global_step)
     return total_loss
 
 
-def twostage(teacher, student,args, batch, time_diff, global_step, wandb):
+def twostage(teacher, student,args, batch, time_diff, global_step, wandb, eval=False):
+    log = 'eval' if eval else 'train'
     time_proportion = time_diff / args.total_training_time
     if time_proportion < 0.5 :
         mlm_loss , attentions_st, values_st, prediction_score_st = \
             student.forward(batch, output_attentions=True, output_qkv=True, output_loss=True)
         if master_process(args):
-            wandb.log({"train/loss": mlm_loss}, step=global_step)
+            wandb.log({f"{log}/loss": mlm_loss}, step=global_step)
         total_loss = mlm_loss
     else:
         with torch.no_grad():
@@ -137,9 +141,9 @@ def twostage(teacher, student,args, batch, time_diff, global_step, wandb):
                 att_val_kl(attentions_st, values_st, attentions_teacher, values_teacher, args.layer_selection)
         total_loss = loss_att + loss_val
         if master_process(args):
-            wandb.log({"train/loss": total_loss}, step=global_step)
-            wandb.log({"train/loss_att": loss_att}, step=global_step)
-            wandb.log({"train/loss_val": loss_val}, step=global_step)
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
+            wandb.log({f"{log}/loss_val": loss_val}, step=global_step)
     return total_loss 
 
 
