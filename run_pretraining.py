@@ -121,11 +121,11 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
         #         model.forward(batch, output_attentions=True, output_qkv=True)
         if teacher is not None:
             if args.method == 'att_val_og' or 'minilm_v2' or 'pear_col':
-                total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb)
+                total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb, eval=True)
                 
             if args.method == 'att_val_two_stage':
                 time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
-                total_loss = twostage(teacher, model, args, batch, time_diff, global_step, wandb)
+                total_loss = twostage(teacher, model, args, batch, time_diff, global_step, wandb, eval=True)
 
 
         torch.cuda.synchronize()
