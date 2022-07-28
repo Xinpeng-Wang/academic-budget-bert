@@ -19,7 +19,7 @@ import json
 import logging
 import os
 
-from transformers import BertTokenizer, RobertaTokenizer, BertModel
+from transformers import BertTokenizer, RobertaTokenizer, BertModel, BertForMaskedLM
 
 from pretraining.configs import PretrainedBertConfig, PretrainedRobertaConfig
 from pretraining.modeling import BertForPreTraining, BertLMHeadModel
@@ -35,7 +35,8 @@ MODELS = {
 }
 
 HFMODELS = {
-    "bert": (BertModel, PretrainedBertConfig, BertTokenizer)
+    "bert": (BertModel, PretrainedBertConfig, BertTokenizer),
+    "bert-mlm": (BertForMaskedLM, PretrainedBertConfig, BertTokenizer)
 }
 
 
@@ -153,7 +154,7 @@ class BasePretrainModel(object):
 
 
 
-def BasePretrainModelHuggingFace(object):
+class BasePretrainModelHuggingFace(object):
     def __init__(
         self,
         args,
