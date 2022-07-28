@@ -497,7 +497,7 @@ def prepare_distillation_optimizer(args):
      # Load Pre-training Model skeleton + supplied model config
     student = BasePretrainModel(args)
     if args.student_initialize is not None:
-        student.network.from_pretrained_customized(args.student_initialize, args=None)
+        student.network=BertLMHeadModel.from_pretrained_customized(args.student_initialize, args=None)
 
     # Optimizer parameters
     optimizer_grouped_parameters = student.prepare_optimizer_parameters(
