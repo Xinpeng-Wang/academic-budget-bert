@@ -17,7 +17,8 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
     layer_selection = [int(item) for item in layer_selection.split(',')]
 
     new_teacher_atts = [teacher_atts[i] for i in layer_selection]
-    student_atts = [student_atts[-1]]
+    if type(layer_selection) is not list: 
+        student_atts = [student_atts[-1]]
     #TODO: change to softmax and log 
     for student_att, teacher_att in zip(student_atts, new_teacher_atts):
         # batch_size, head_num, lenght = student_att.shape[0], student_att.shape[1], student_att.shape[2]
@@ -28,8 +29,10 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
         loss_att += loss_kl_tmp
 
     new_teacher_value = [teacher_qkv[i][2] for i in layer_selection]
-
-    student_vals = [student_vals[-1][2]]
+    if type(layer_selection) is not list:
+        student_vals = [student_qkv[-1][2]]
+    else:
+        student_vals = [qkv[2] for qkv in student_qkv]
     for student_value, teacher_value in zip(student_vals, new_teacher_value):
         vr_student = F.log_softmax(torch.bmm(student_value.reshape(-1, length, dk), student_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt, dim=-1)
         vr_teacher = F.softmax(torch.bmm(teacher_value.reshape(-1, length, dk), teacher_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt, dim=-1)
