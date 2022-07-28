@@ -17,6 +17,7 @@ tests/
 models
 training-out
 runs
+out
 src/
 
 notebooks/data/
