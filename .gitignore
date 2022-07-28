@@ -13,3 +13,10 @@ out/
 models/
 
 tests/
+
+models
+training-out
+runs
+src/
+
+notebooks/data/
