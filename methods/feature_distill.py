@@ -17,7 +17,7 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
     layer_selection = [int(item) for item in layer_selection.split(',')]
 
     new_teacher_atts = [teacher_atts[i] for i in layer_selection]
-    if type(layer_selection) is not list: 
+    if len(layer_selection) == 1: 
         student_atts = [student_atts[-1]]
     #TODO: change to softmax and log 
     for student_att, teacher_att in zip(student_atts, new_teacher_atts):
@@ -29,7 +29,7 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
         loss_att += loss_kl_tmp
 
     new_teacher_value = [teacher_qkv[i][2] for i in layer_selection]
-    if type(layer_selection) is not list:
+    if len(layer_selection) == 1:
         student_vals = [student_qkv[-1][2]]
     else:
         student_vals = [qkv[2] for qkv in student_qkv]
