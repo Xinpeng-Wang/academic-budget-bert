@@ -58,7 +58,7 @@ from transformers import HfArgumentParser
 
 from methods.feature_distill import att_val_kl, att_val_frame, twostage
 from clearml import Task
-from clearml import Logger as cl_logger
+# from clearml import Logger as cl_logger
 import argparse
 
 
@@ -497,7 +497,7 @@ def prepare_distillation_optimizer(args):
      # Load Pre-training Model skeleton + supplied model config
     student = BasePretrainModel(args)
     if args.student_initialize is not None:
-        student.network=BertLMHeadModel.from_pretrained_customized(args.student_initialize, args=None)
+        student.network = BertLMHeadModel.from_pretrained_customized(args.student_initialize, args=None)
 
     # Optimizer parameters
     optimizer_grouped_parameters = student.prepare_optimizer_parameters(
@@ -528,8 +528,8 @@ def prepare_distillation_optimizer(args):
     args.fp16 = student.network.fp16_enabled()
 
     teacher = BertLMHeadModel.from_pretrained_customized(args.teacher_path, args=None)
-    teacher.to(args.device)
-    # teacher = deepspeed.init_inference(teacher, dtype=torch.float16 if args.fp16 else torch.float32, mp_size=dist.get_world_size())
+    # teacher.to(args.device)
+    teacher = deepspeed.init_inference(teacher, dtype=torch.float16 if args.fp16 else torch.float32, mp_size=dist.get_world_size())
     return teacher, student, optimizer, lr_scheduler
 
 def check_if_early_stop(eval_loss, scale_counter, args):
