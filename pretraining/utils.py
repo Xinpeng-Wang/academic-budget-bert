@@ -148,3 +148,44 @@ def change_state_dict(state_dict):
     for old_key, new_key in zip(old_keys, new_keys):
         state_dict[new_key] = state_dict.pop(old_key)
     return state_dict
+
+def budget_to_huggingface(state_dict):
+    old_keys = []
+    new_keys = []
+    for key in state_dict.keys():
+        if 'embeddings.LayerNorm' in key:
+            if 'weight' in key:
+                new_key = key.replace('weight','gamma')
+                old_keys.append(key)
+                new_keys.append(new_key)
+            if 'bias' in key:
+                new_key = key.replace( 'bias', 'beta')
+                old_keys.append(key)
+                new_keys.append(new_key)
+        if 'PreAttentionLayerNorm' in key:
+            if 'weight' in key:
+                new_key = key.replace( 'PreAttentionLayerNorm.weight','attention.output.LayerNorm.gamma')
+                old_keys.append(key)
+                new_keys.append(new_key)
+            if 'bias' in key:
+                new_key = key.replace( 'PreAttentionLayerNorm.bias','attention.output.LayerNorm.beta')
+                old_keys.append(key)
+                new_keys.append(new_key)
+        if 'PostAttentionLayerNorm' in key:
+            if 'weight' in key:
+                new_key = key.replace( 'PostAttentionLayerNorm.weight','output.LayerNorm.gamma')
+                old_keys.append(key)
+                new_keys.append(new_key)
+            if 'bias' in key:
+                new_key = key.replace( 'PreAttentionLayerNorm.bias','output.LayerNorm.beta')
+                old_keys.append(key)
+                new_keys.append(new_key)
+        if 'intermediate.dense_act' in key:
+            new_key = key.replace( 'intermediate.dense_act','intermediate')
+            old_keys.append(key)
+            new_keys.append(new_key)
+    for old_key, new_key in zip(old_keys, new_keys):
+        state_dict[new_key] = state_dict.pop(old_key)
+    return state_dict
+    
+            
