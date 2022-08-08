@@ -5,7 +5,7 @@ from pretraining.utils import master_process
 # import wandb
 from .pear_loss import Dist_att
 import random
-
+import numpy as np
 dist_att = Dist_att()
 
 def data_aug(batch):
@@ -13,12 +13,17 @@ def data_aug(batch):
     ## set prob threshold ##
     if random.random() >= 0.5:
     ## selection postion ##
-        positions = random.sample(range(0,length), 10)
+        # positions = random.sample(range(0,length), 10)
+        positions = np.random.rand(bz, length).argpartition(100,axis=1)[:,:100]
     ## selection vocab ##
-        vocab = random.randrange(0, 30522)
+        # vocab = random.randrange(0, 30522)
+        vocab = np.random.rand(bz, 30522).argpartition(100,axis=1)[:,:100]
     ## switch ##
-        batch[1][:,positions] = vocab
-        batch[2][:,positions] = 1
+        # batch[1][positions] = torch.from_numpy(vocab).cuda()
+        # batch[2][positions] = 1
+        for i in range(bz):
+            batch[1][i,positions[i,:]]=torch.from_numpy(vocab[i,:]).cuda()
+            batch[2][i,positions[i,:]]=1
     return batch
 
 def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
