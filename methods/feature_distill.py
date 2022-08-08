@@ -22,9 +22,9 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
     #TODO: change to softmax and log 
     for student_att, teacher_att in zip(student_atts, new_teacher_atts):
         # batch_size, head_num, lenght = student_att.shape[0], student_att.shape[1], student_att.shape[2]
-        student_att = F.log_softmax(student_att, dim=-1)
-        teacher_att = F.softmax(teacher_att, dim=-1)
-        loss_kl_tmp = F.kl_div(student_att, teacher_att, reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
+        student_att_logsoft = student_att.log_softmax(dim=3)
+        teacher_att_soft = teacher_att.softmax(dim=3)
+        loss_kl_tmp = F.kl_div(student_att_logsoft.to(torch.float32), teacher_att_soft.to(torch.float32), reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
         # loss_kl_tmp = F.mse_loss(student_att, teacher_att)
         loss_att += loss_kl_tmp
 
@@ -37,13 +37,34 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
         vr_student = F.log_softmax(torch.bmm(student_value.reshape(-1, length, dk), student_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt, dim=-1)
         vr_teacher = F.softmax(torch.bmm(teacher_value.reshape(-1, length, dk), teacher_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt, dim=-1)
 
-        loss_value_tmp = F.kl_div(vr_student, vr_teacher, reduction='sum')/(batch_size * num_head * length)
+        loss_value_tmp = F.kl_div(vr_student.to(torch.float32), vr_teacher.to(torch.float32), reduction='sum')/(batch_size * num_head * length)
         # loss_value_tmp = F.mse_loss(vr_student, vr_teacher)
         loss_value += loss_value_tmp
     # loss  = loss_att + loss_value
     return loss_att, loss_value
 
 
+def att_mse(student_atts, teacher_atts, layer_selection):
+    #TODO: 把这个fp16 32， 正规化，以及看amp方案
+    loss_att = 0.
+    layer_selection = [int(item) for item in layer_selection.split(',')]
+
+    new_teacher_atts = [teacher_atts[i] for i in layer_selection]
+    if len(layer_selection) == 1: 
+        student_atts = [student_atts[-1]]
+    #TODO: change to softmax and log 
+    for student_att, teacher_att in zip(student_atts, new_teacher_atts):
+        # batch_size, head_num, lenght = student_att.shape[0], student_att.shape[1], student_att.shape[2]
+        # student_att_logsoft = student_att.log_softmax(dim=3)
+        # teacher_att_soft = teacher_att.softmax(dim=3)
+        # loss_kl_tmp = F.kl_div(student_att_logsoft.to(torch.float32), teacher_att_soft.to(torch.float32), reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
+        student_att = torch.where(student_att <= -1e2, torch.zeros_like(student_att),
+                                    student_att)
+        teacher_att = torch.where(teacher_att <= -1e2, torch.zeros_like(teacher_att),
+                                    teacher_att)
+        loss_att_tmp = F.mse_loss(student_att.to(torch.float32), teacher_att.to(torch.float32))
+        loss_att += loss_att_tmp
+    return loss_att
 
 
 def minilm_v2(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
@@ -92,8 +113,8 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
     with torch.no_grad():
         attentions_teacher, qkv_teacher, prediction_score_teacher = \
                 teacher(batch, output_attentions=True, output_qkv=True, output_loss=False)
-    mlm_loss, attentions_st, qkv_st, prediction_score_st = \
-            student.forward(batch, output_attentions=True, output_qkv=True, output_loss=True)
+    attentions_st, qkv_st, prediction_score_st = \
+            student.forward(batch, output_attentions=True, output_qkv=True, output_loss=False)
     if args.method == 'att_val_og':
         loss_att, loss_val = \
             att_val_kl(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
@@ -121,6 +142,13 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
             wandb.log({f"{log}/inter_token_2": inter_token_2}, step=global_step)
             wandb.log({f"{log}/inter_head": inter_head}, step=global_step)
             wandb.log({f"{log}/inter_sentence": inter_sentence}, step=global_step)
+    elif args.method == 'att_mse':
+        loss_att= \
+            att_mse(attentions_st, attentions_teacher, args.layer_selection)
+        total_loss = loss_att
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
     return total_loss
 
 

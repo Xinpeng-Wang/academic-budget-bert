@@ -79,8 +79,10 @@ Task.set_credentials(
             files_host="http://35.223.63.40:8081", 
             key='VJ9XKRTX42WZQG6NRFG6', 
             secret='vvugyeM2Jd7AWCkONYpZdB7f25kbwczqbClrjTh1Sei0Fpinu9')
-
+# task = Task.set_offline()
+Task.set_offline(offline_mode=True)
 task = Task.init(project_name=f'master thesis/{group}', task_name=run_name)
+# task.set_offline()
 clearml_logger = task.get_logger()
 
 
@@ -104,7 +106,7 @@ class PrinterCallback(TrainerCallback):
         lr = kwargs['lr_scheduler'].get_last_lr()[0]
         step = state.global_step
         wandb.log({"lr": lr}, step = step)
-        clearml_logger.report_scalar("train", "lr", iteration=step ,value=lr)
+        # clearml_logger.report_scalar("train", "lr", iteration=step ,value=lr)
         pass
 
     

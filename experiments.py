@@ -76,7 +76,7 @@ def experiment_start(task, device, batch_size, lr, path, group):
     
 
     if task in ['cola', 'sst2', 'rte', 'mrpc']:
-        epoch = 3
+        epoch = 10
         config['--eval_steps'] = 50
     else:
         epoch =10
@@ -95,32 +95,43 @@ def experiment_start(task, device, batch_size, lr, path, group):
 
 
 model_list = [
-    # ("~/code/academic-budget-bert/training-out/general_distill_6layer_30h-experiment/experiment/epoch1000000_step150619","general_distill_6layer_30h-experiment_epoch1000000_step150619" ),
-    # ("~/code/academic-budget-bert/training-out/general_distill_6layer_60h_continue-experiment/experiment/epoch1000000_step301541","general_distill_6layer_60h_continue-experiment_epoch1000000_step301541")
-    # ( "~/code/academic-budget-bert/training-out/general_distill_9layer_36h-experiment/experiment/epoch1000000_step141206","general_distill_9layer_36h-experiment_epoch1000000_step141206")
-    # ("~/code/academic-budget-bert/training-out/general_distill_6layer_30h_lastlayer_teacher-experiment/experiment/epoch1000000_step174459", "general_distill_6layer_30h_lastlayer_teacher-experiment"),
-    # ("~/code/academic-budget-bert/training-out/pretraining_experiment-/epoch1000000_step210494", "bertbase")
-    ("training-out/general_distill_6layer_30h_twostage_attval_mlm-experiment-experiment/experiment/epoch1000000_step232546", "general_distill_6layer_30h_twostage_attval_mlm")
+
+# ("training-out/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz-experiment/experiment/epoch2767_step408953","post/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz/epoch2767_step408953")
+# ("training-out/general_6layer_30h_from_base_skip_att_val-experiment/experiment/epoch3399_step124322","post/general_6layer_30h_from_base_skip_att_val/epoch3399_step124322")
+# ("training-out/general_9layer_30h_from_base_last_att_val_nofuse_5e-4-experiment/experiment/epoch774_step114636","post/general_9layer_30h_from_base_last_att_val_nofuse_5e/epoch774_step114636")
+# ("training-out/general_6layer_30h_from_base_skip_att_val-experiment/experiment/epoch3820_step139697", "post/general_6layer_30h_from_base_skip_att_val/epoch3820_step139697/apex")
+# ("training-out/pre-ln/general_distill_6layer_60h_continue-experiment/experiment/epoch1000000_step301541","pre/general_distill_6layer_60h_continue/epoch1000000_step301541")
+# ("training-out/pre-ln/general_distill_6layer_30h-experiment/experiment/epoch1000000_step150619", "pre/general_distill_6layer_30h/epoch1000000_step150619")
+# ("training-out/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz-experiment/experiment/epoch3688_step545046","post/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz/epoch3688_step545046")
+# ("training-out/general_9layer_30h_from_base_last_att_val_nofuse_5e-4-experiment/experiment/epoch1163_step172068",'post/general_9layer_30h_from_base_last_att_val_nofuse_5e-4/epoch1163_step172068')
+# ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch647_step36396", "post/6layer_from_base_last_1024_512length_30h_5e-4/epoch647_step36396")
+# ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch1297_step72796","post/6layer_from_base_last_1024_512length_30h_5e-4/epoch1297_step72796")
+# ("training-out/fail_reproduce_2-experiment/experiment/epoch436_step64866","post/fail_reproduce_2/epoch436_step64866")
+# ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch3351_step188102","post/6layer_from_base_last_1024_512length_30h_5e-4/epoch3351_step188102")
+# ("training-out/test-mse/mse/epoch767_step43208","post/test-mse/epoch767_step43208")
+("training-out/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz-experiment/experiment/epoch4150_step613173","post/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz/epoch4150_step613173")
 ]
 
 
 
-num_workers = 4
+num_workers = 0
 
 
 args = []
 
 for model in model_list:
 
-    # for task in ['cola', 'qnli', 'sst2', 'mnli', 'qqp', 'rte', 'cola', 'mrpc']: 
-    for task in ['rte']:
+    for task in [ 'rte']: #'mnli', 'qqp','qnli','sst2', 'cola', , 'mrpc'
+    # for task in ['rte']:
     # for task in ["rte"]:
         
-        idx = 0
+        
         for lr in [1e-5, 3e-5, 5e-5, 8e-5]:
-            for bz in [8]:#, 16, 32]:
+            idx = 0
+            for bz in [16, 32]:
                 args.append((task, idx, bz, lr, model[0], model[1]))
-                idx += 1
+                num_workers +=1 
+            idx+=1
 
 writer_workers = Pool(num_workers)
 writer_workers.starmap(experiment_start, args)
@@ -128,3 +139,16 @@ writer_workers.starmap(experiment_start, args)
 
 
 # experiment_start('cola', 0, 16,1e-5)
+
+
+# pre-ln
+# ("~/code/academic-budget-bert/training-out/general_distill_6layer_60h_continue-experiment/experiment/epoch1000000_step301541","general_distill_6layer_60h_continue-experiment_epoch1000000_step301541")
+# ("~/code/academic-budget-bert/training-out/general_distill_6layer_30h-experiment/experiment/epoch1000000_step150619","general_distill_6layer_30h-experiment_epoch1000000_step150619" ),
+# ( "~/code/academic-budget-bert/training-out/general_distill_9layer_36h-experiment/experiment/epoch1000000_step141206","general_distill_9layer_36h-experiment_epoch1000000_step141206")
+# ("~/code/academic-budget-bert/training-out/general_distill_6layer_30h_lastlayer_teacher-experiment/experiment/epoch1000000_step174459", "general_distill_6layer_30h_lastlayer_teacher-experiment"),
+# ("~/code/academic-budget-bert/training-out/pretraining_experiment-/epoch1000000_step210494", "bertbase")
+# ("training-out/general_distill_6layer_30h_twostage_attval_mlm-experiment-experiment/experiment/epoch1000000_step232546", "general_distill_6layer_30h_twostage_attval_mlm")
+# ("training-out/general_12layer_30h_from_bertlarge_lastlayer-experiment/experiment/epoch1000000_step78084",  "general_12layer_30h_from_bertlarge_lastlayer")
+# ("training-out/general_6layer_10h_from_base_lastlayer_pearcol-experiment/experiment/epoch2287_step83627", "general_6layer_10h_from_base_lastlayer_pearcol_epoch2287_step83627")
+# ("training-out/bert_base/bert_base", "bert_base")
+# ("training-out/general_6layer_10h_from_base_lastlayer_pearcol-experiment/experiment/epoch1000000_step167145","general_6layer_10h_from_base_lastlayer_pearcol_epoch1000000_step167145")
