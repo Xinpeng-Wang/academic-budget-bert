@@ -4,8 +4,22 @@ import torch
 from pretraining.utils import master_process
 # import wandb
 from .pear_loss import Dist_att
+import random
 
 dist_att = Dist_att()
+
+def data_aug(batch):
+    bz, length = batch[1].shape
+    ## set prob threshold ##
+    if random.random() >= 0.5:
+    ## selection postion ##
+        positions = random.sample(range(0,length), 10)
+    ## selection vocab ##
+        vocab = random.randrange(0, 30522)
+    ## switch ##
+        batch[1][:,positions] = vocab
+        batch[2][:,positions] = 1
+    return batch
 
 def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
     #TODO: 把这个fp16 32， 正规化，以及看amp方案
@@ -109,7 +123,8 @@ def minilm_v2(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_select
 
 def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False):
     log = 'eval' if eval else 'train'
-
+    if args.aug and not eval:
+        batch = data_aug(batch)
     with torch.no_grad():
         attentions_teacher, qkv_teacher, prediction_score_teacher = \
                 teacher(batch, output_attentions=True, output_qkv=True, output_loss=False)

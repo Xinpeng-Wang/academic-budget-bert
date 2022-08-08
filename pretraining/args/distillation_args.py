@@ -36,3 +36,7 @@ class DistillationArguments:
         default=None,
         metadata={"help": "student to initialize from"}
     )
+
+    aug: Optional[bool] = field(
+        default=False, metadata={"help": "whether to use data augmentation"}
+    )
