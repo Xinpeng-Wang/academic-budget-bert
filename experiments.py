@@ -109,7 +109,7 @@ model_list = [
 # ("training-out/fail_reproduce_2-experiment/experiment/epoch436_step64866","post/fail_reproduce_2/epoch436_step64866")
 # ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch3351_step188102","post/6layer_from_base_last_1024_512length_30h_5e-4/epoch3351_step188102")
 # ("training-out/test-mse/mse/epoch767_step43208","post/test-mse/epoch767_step43208")
-("training-out/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz-experiment/experiment/epoch4150_step613173","post/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz/epoch4150_step613173")
+("/dss/dsshome1/lxc01/di75wud/code/academic-budget-bert/training-out/general_6layer_30h_from_base_skip_att_val-experiment/experiment/epoch425_step15616","post/general_6layer_30h_from_base_skip_att_val/epoch425_step15616")
 ]
 
 
@@ -121,7 +121,7 @@ args = []
 
 for model in model_list:
 
-    for task in [ 'rte']: #'mnli', 'qqp','qnli','sst2', 'cola', , 'mrpc'
+    for task in [ 'cola']: #'mnli', 'qqp','qnli','sst2', 'cola', , 'mrpc'
     # for task in ['rte']:
     # for task in ["rte"]:
         
