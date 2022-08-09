@@ -433,7 +433,7 @@ def parse_arguments():
     args.logger = logger
     args.ds_config = create_ds_config(args)
     args.deepspeed_config = args.ds_config
-    args.job_name = f"{args.job_name}-{args.current_run_id}"
+    args.job_name = f"{args.job_name}"
     logger.info(f"Running Config File: {args.job_name}")
     logger.info(f"Args = {args}")
     os.makedirs(args.output_dir, exist_ok=True)
