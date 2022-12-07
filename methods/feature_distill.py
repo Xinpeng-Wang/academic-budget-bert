@@ -26,6 +26,10 @@ def data_aug(batch):
             batch[2][i,positions[i,:]]=1
     return batch
 
+def hidden_mse_learn():
+    
+    return loss
+
 def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
     #TODO: 把这个fp16 32， 正规化，以及看amp方案
     loss_att = 0.
@@ -41,9 +45,12 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
     #TODO: change to softmax and log 
     for student_att, teacher_att in zip(student_atts, new_teacher_atts):
         # batch_size, head_num, lenght = student_att.shape[0], student_att.shape[1], student_att.shape[2]
-        student_att_logsoft = student_att.log_softmax(dim=3)
+        # student_att_logsoft = student_att.log_softmax(dim=3)
+        student_att_soft = F.softmax(student_att, dim=-1)
+        student_att_logsoft = torch.clamp(student_att_soft, 1e-7, 1).log()
         teacher_att_soft = teacher_att.softmax(dim=3)
-        loss_kl_tmp = F.kl_div(student_att_logsoft.to(torch.float32), teacher_att_soft.to(torch.float32), reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
+        loss_kl_tmp = F.kl_div(student_att_logsoft, teacher_att_soft, reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
+        # loss_kl_tmp = F.kl_div(student_att_logsoft.to(torch.float32), teacher_att_soft.to(torch.float32), reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
         # loss_kl_tmp = F.mse_loss(student_att, teacher_att)
         loss_att += loss_kl_tmp
 
@@ -53,10 +60,14 @@ def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selec
     else:
         student_vals = [qkv[2] for qkv in student_qkv]
     for student_value, teacher_value in zip(student_vals, new_teacher_value):
-        vr_student = F.log_softmax(torch.bmm(student_value.reshape(-1, length, dk), student_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt, dim=-1)
+        vr_student = torch.bmm(student_value.reshape(-1, length, dk), student_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt
+        vr_student_soft = F.softmax(vr_student, dim=-1)
+        vr_student = torch.clamp(vr_student_soft, 1e-7, 1).log()
+        # vr_student = F.logsoftmax(vr_student, dim=-1)
         vr_teacher = F.softmax(torch.bmm(teacher_value.reshape(-1, length, dk), teacher_value.reshape(-1, length, dk).transpose(1,2))/dk_sqrt, dim=-1)
+        loss_value_tmp = F.kl_div(vr_student, vr_teacher, reduction='sum')/(batch_size * num_head * length)
 
-        loss_value_tmp = F.kl_div(vr_student.to(torch.float32), vr_teacher.to(torch.float32), reduction='sum')/(batch_size * num_head * length)
+        # loss_value_tmp = F.kl_div(vr_student.to(torch.float32), vr_teacher.to(torch.float32), reduction='sum')/(batch_size * num_head * length)
         # loss_value_tmp = F.mse_loss(vr_student, vr_teacher)
         loss_value += loss_value_tmp
     # loss  = loss_att + loss_value

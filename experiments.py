@@ -110,9 +110,15 @@ model_list = [
 # ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch3351_step188102","post/6layer_from_base_last_1024_512length_30h_5e-4/epoch3351_step188102")
 # ("training-out/test-mse/mse/epoch767_step43208","post/test-mse/epoch767_step43208")
 # ("/dss/dsshome1/lxc01/di75wud/code/academic-budget-bert/training-out/general_6layer_30h_from_base_skip_att_val-experiment/experiment/epoch425_step15616","post/general_6layer_30h_from_base_skip_att_val/epoch425_step15616")
-# ("training-out/lrz/back_commit_fail_reproduce_1000epoch-01/01/epoch227_step33807", "post/back_commit_fail_reproduce_1000epoch/epoch227_step33807")
-# ("training-out/lrz/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz-experiment/experiment/epoch227_step33807","post/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz/epoch227_step33807")
-("training-out/lrz/back_commit_fail_reproduce_1000epoch_4096-01/01/epoch240_step8832","post/back_commit_fail_reproduce_1000epoch_4096/epoch240_step8832")
+# ("training-out/att_val_3072_512_1e-3/3/epoch1879_step35075","post/att_val_3072_512_1e-3/epoch1879_step35075")
+# ("training-out/att_val_256_512_5e-4_fp16apex_dsinf_preln_kl32/1/epoch719_step161988", 'post/att_val_256_512_5e-4_fp16apex_dsinf_preln_kl32/epoch719_step161988')
+# ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch1946_step109223", 'post/6layer_from_base_last_1024_512length_30h_5e-4-experiment/epoch1946_step109223')
+# ('training-out/att_val_3072_512_1e-3/3/epoch4334_step80872', 'post/att_val_3072_512_1e-3/epoch4334_step80872')
+# ('training-out/att_val_256_512_5e-4_fp16apex_dsinf_preln_kl32/1/epoch1569_step352972', 'post/att_val_256_512_5e-4_fp16apex_dsinf_preln_kl32/epoch1569_step352972')
+("training-out/pre-ln/general_6layer_10h_from_base_lastlayer_pearcol-experiment/experiment/epoch1000000_step167145", "pre/general_6layer_10h_from_base_lastlayer_pearcol-experiment/epoch1000000_step167145"),
+("training-out/InitMinilm_6layer_30h_from_base_last_att_val_nofuse_5e-4-experiment/experiment/epoch2146_step317102", "post/InitMinilm_6layer_30h_from_base_last_att_val_nofuse_5e-4-experiment/epoch2146_step317102"),
+("training-out/pre-ln/general_distill_6layer_30h_twostage_attval_mlm-experiment-experiment/experiment/epoch1000000_step232546", "pre/general_distill_6layer_30h_twostage_attval_mlm-experiment/epoch1000000_step232546")
+>>>>>>> e03117166c541d1b717a37286c4b4ffc467d24e0
 ]
 
 
@@ -123,21 +129,37 @@ num_workers = 0
 args = []
 
 for model in model_list:
-
-    for task in [ 'rte']: #'mnli', 'qqp','qnli','sst2', 'cola', , 'mrpc'
+    idx = 0
+    for task in ['cola','rte','mnli', 'qqp','qnli','sst2', 'mrpc']:
     # for task in ['rte']:
     # for task in ["rte"]:
-        
-        idx = 0
+        if idx == 8:
+            idx = 0
         for lr in [1e-5, 3e-5, 5e-5, 8e-5]:
-            
-            for bz in [16, 32]:
-                args.append((task, idx, bz, lr, model[0], model[1]))
-                num_workers +=1 
+            bz=32
+            if task == 'rte':
+                bz=16
+            args.append((task, idx, bz, lr, model[0], model[1]))
+            num_workers +=1 
             idx+=1
 
-writer_workers = Pool(num_workers)
-writer_workers.starmap(experiment_start, args)
+    writer_workers = Pool(num_workers)
+    writer_workers.starmap(experiment_start, args)
+
+# for model in model_list:
+
+#     for task in ['cola']:#[ 'rte','mnli', 'qqp','qnli','sst2', 'cola', 'mrpc']:
+#     # for task in ['rte']:
+#     # for task in ["rte"]:
+#         lr=3e-5
+        
+#         idx = 1
+#         bz = 32
+#         if task == 'rte':
+#             bz=16
+#         args.append((task, idx, bz, lr, model[0], model[1]))
+#         num_workers +=1 
+#         # idx+=1
 
 
 

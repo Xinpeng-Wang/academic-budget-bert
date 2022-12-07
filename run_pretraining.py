@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from torch.distributed.elastic.multiprocessing.errors import record
 import json
 import logging
 import os
@@ -57,7 +57,7 @@ from tqdm import tqdm
 from transformers import HfArgumentParser
 
 from methods.feature_distill import att_val_kl, att_val_frame, twostage
-from clearml import Task
+# from clearml import Task
 # from clearml import Logger as cl_logger
 import argparse
 
@@ -135,9 +135,6 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
         eval_loss += total_loss.mean().item()
         num_eval_steps += 1
     eval_loss = eval_loss / num_eval_steps
-    if master_process(args):
-        # clearml_logger.report_scalar("loss", "eval: loss", iteration=global_step ,value=eval_loss)
-        wandb.log({"Validation/loss": eval_loss}, step=global_step )
 
     logger.info(f"Validation Loss for epoch/step {index + 1}/{step} is: {eval_loss}")
     if master_process(args):
@@ -284,6 +281,8 @@ def train(
     pretrain_dataset_provider.release_shard(index)
     global_data_samples = current_data_sample_count
 
+    if master_process(args):
+        wandb.log({"Train/epoch": index}, step=global_step)
     logger.info(f"Epoch {index}: check whether to run validation...")
     if validation_dataset is not None and scale_counter_at_1 < args.scale_cnt_limit:
         time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
@@ -530,6 +529,8 @@ def prepare_distillation_optimizer(args):
     teacher = BertLMHeadModel.from_pretrained_customized(args.teacher_path, args=None)
     # teacher.to(args.device)
     teacher = deepspeed.init_inference(teacher, dtype=torch.float16 if args.fp16 else torch.float32, mp_size=dist.get_world_size())
+    # teacher = deepspeed.init_inference(teacher, dtype=torch.float32, mp_size=dist.get_world_size())
+
     return teacher, student, optimizer, lr_scheduler
 
 def check_if_early_stop(eval_loss, scale_counter, args):
@@ -628,7 +629,7 @@ def start_training(args, model, optimizer, lr_scheduler, start_epoch, teacher=No
                 last_global_step=global_step,
                 last_global_data_samples=global_data_samples,
                 exp_start_marker=args.exp_start_marker,
-                ckpt_id="latest_checkpoint",
+                ckpt_id=f"checkpoint_epoch_{index}",
             )
             dist.barrier()
     logger.info(
@@ -667,12 +668,12 @@ def setup_wandb(args, model, resume_id=None):
             wandb.init(
                 project=args.project_name,
                 group=args.job_name,
-                dir="/tmp",
+                dir="wandb",
                 resume="allow",
                 id=resume_id,
             )
         else:
-            wandb.init(project=args.project_name, group=args.job_name, dir="/tmp")
+            wandb.init(project=args.project_name, group=args.job_name, dir="wandb")
         wandb.config.update(args, allow_val_change=True)
         wandb.watch(model)
     else:
@@ -774,7 +775,7 @@ def prepare_resuming_checkpoint(args, model):
 
     return start_epoch, wandb_run_id
 
-
+@record
 def main():
     start_time = time.time()
     args = parse_arguments()
@@ -791,7 +792,7 @@ def main():
     # Load a checkpoint if resuming training
     if args.load_training_checkpoint is not None:
         start_epoch, wandb_run_id = prepare_resuming_checkpoint(args, model)
-
+    wandb_run_id = None
     # setup W&B logging
     setup_wandb(args, model.network, resume_id=wandb_run_id)
     # clearml_logger = setup_clearml(args) 
