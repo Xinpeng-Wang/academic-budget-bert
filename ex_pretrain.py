@@ -12,7 +12,7 @@ yaml.preserve_quotes = True
 config_path = 'config/pretrain.yaml'
 config = yaml.load(Path(config_path))
 
-cmd = 'deepspeed run_pretraining.py '
+cmd = 'CUDA_VISIBLE_DEVICES=MIG-feee0c61-26ec-5616-bb59-b6d777cc4f34,MIG-c0386dcc-84bf-55a0-bb83-93d415e7a9e3  python -m torch.distributed.launch run_pretraining.py '
 
 options = []
 for k, v in config.items():   

@@ -109,7 +109,10 @@ model_list = [
 # ("training-out/fail_reproduce_2-experiment/experiment/epoch436_step64866","post/fail_reproduce_2/epoch436_step64866")
 # ("training-out/6layer_from_base_last_1024_512length_30h_5e-4-experiment/experiment/epoch3351_step188102","post/6layer_from_base_last_1024_512length_30h_5e-4/epoch3351_step188102")
 # ("training-out/test-mse/mse/epoch767_step43208","post/test-mse/epoch767_step43208")
-("/dss/dsshome1/lxc01/di75wud/code/academic-budget-bert/training-out/general_6layer_30h_from_base_skip_att_val-experiment/experiment/epoch425_step15616","post/general_6layer_30h_from_base_skip_att_val/epoch425_step15616")
+# ("/dss/dsshome1/lxc01/di75wud/code/academic-budget-bert/training-out/general_6layer_30h_from_base_skip_att_val-experiment/experiment/epoch425_step15616","post/general_6layer_30h_from_base_skip_att_val/epoch425_step15616")
+# ("training-out/lrz/back_commit_fail_reproduce_1000epoch-01/01/epoch227_step33807", "post/back_commit_fail_reproduce_1000epoch/epoch227_step33807")
+# ("training-out/lrz/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz-experiment/experiment/epoch227_step33807","post/general_6layer_30h_from_base_last_att_val_no_fuse_1024bz/epoch227_step33807")
+("training-out/lrz/back_commit_fail_reproduce_1000epoch_4096-01/01/epoch240_step8832","post/back_commit_fail_reproduce_1000epoch_4096/epoch240_step8832")
 ]
 
 
@@ -121,13 +124,13 @@ args = []
 
 for model in model_list:
 
-    for task in [ 'cola']: #'mnli', 'qqp','qnli','sst2', 'cola', , 'mrpc'
+    for task in [ 'rte']: #'mnli', 'qqp','qnli','sst2', 'cola', , 'mrpc'
     # for task in ['rte']:
     # for task in ["rte"]:
         
-        
+        idx = 0
         for lr in [1e-5, 3e-5, 5e-5, 8e-5]:
-            idx = 0
+            
             for bz in [16, 32]:
                 args.append((task, idx, bz, lr, model[0], model[1]))
                 num_workers +=1 
