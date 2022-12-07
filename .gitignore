@@ -21,3 +21,5 @@ out
 src/
 
 notebooks/data/
+
+config/
