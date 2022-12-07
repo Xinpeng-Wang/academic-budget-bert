@@ -180,6 +180,7 @@ class RegularLinearActivation(Module):
 
 def get_apex_layer_norm():
     try:
+        pass
         import apex
 
         # apex.amp.register_half_function(apex.normalization.fused_layer_norm, 'FusedLayerNorm')
