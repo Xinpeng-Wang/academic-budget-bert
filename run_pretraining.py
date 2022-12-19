@@ -43,7 +43,7 @@ from pretraining.utils import (
     master_process,
     set_seeds,
 )
-from pretraining.modeling import BertModel, BertLMHeadModel
+from pretraining.modeling import BertLMHeadModel
 from timeit import default_timer as get_now
 
 import deepspeed
@@ -120,7 +120,7 @@ def pretrain_validation(args, model, validation_dataset, step, teacher=None, cle
         # total_loss, attentions_st, values_st, prediction_score_st = \
         #         model.forward(batch, output_attentions=True, output_qkv=True)
         if teacher is not None:
-            if args.method == 'att_val_og' or 'minilm_v2' or 'pear_col':
+            if args.method == 'att_val_og' or 'minilm_v2' or 'pear_col' or 'hidden_mse':
                 total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb, eval=True)
                 
             if args.method == 'att_val_two_stage':

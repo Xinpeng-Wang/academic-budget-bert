@@ -1012,7 +1012,7 @@ class BertForPreTraining(BertPreTrainedModel):
             input_ids,
             token_type_ids,
             attention_mask,
-            output_all_encoded_layers=False,
+            output_all_encoded_layers=True,
             checkpoint_activations=checkpoint_activations,
         )
 
@@ -1087,7 +1087,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         self.cls = BertOnlyMLMHead(config, self.bert.embeddings.word_embeddings.weight)
         self.init_weights()
 
-    def forward(self, batch, output_attentions=False, output_qkv=False, output_loss=True):
+    def forward(self, batch, output_attentions=False, output_qkv=False, output_loss=True, output_hidden_states=False):
         input_ids = batch[1]
         token_type_ids = batch[3]
         attention_mask = batch[2]
@@ -1098,13 +1098,17 @@ class BertLMHeadModel(BertPreTrainedModel):
             input_ids,
             token_type_ids,
             attention_mask,
-            output_all_encoded_layers=False,
+            output_all_encoded_layers=output_hidden_states,
             checkpoint_activations=checkpoint_activations,
             output_attentions = output_attentions,
             output_qkv = output_qkv
         )
         ### bert_output = (sequence_output, pooled_output, attention, value)
-        sequence_output = bert_output[0]
+        if not output_hidden_states:
+            sequence_output = bert_output[0]
+
+        else:
+            sequence_output = bert_output[0][-1]
 
         if masked_lm_labels is None:
             prediction_scores = self.cls(sequence_output)
@@ -1125,6 +1129,8 @@ class BertLMHeadModel(BertPreTrainedModel):
                 outputs += (bert_output[2],)
             if output_qkv:
                 outputs += (bert_output[3],)
+            if output_hidden_states:
+                outputs += (bert_output[0],)
             outputs += (prediction_scores,)
             return outputs
 
@@ -1272,7 +1278,7 @@ class BertForSequenceClassification(BertPreTrainedModel):
             input_ids,
             token_type_ids,
             attention_mask,
-            output_all_encoded_layers=False,
+            output_all_encoded_layers=True,
             checkpoint_activations=checkpoint_activations,
         )
 

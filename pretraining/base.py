@@ -81,8 +81,8 @@ class BasePretrainModel(object):
         self.config = config
         self.network = model_cls(self.config, self.args, **model_kwargs)
 
-    def forward(self, batch, output_attentions=False, output_qkv=False, output_loss=True):
-        outputs = self.network(batch, output_attentions, output_qkv, output_loss)
+    def forward(self, batch, output_attentions=False, output_qkv=False, output_loss=True, output_hidden_states=False):
+        outputs = self.network(batch, output_attentions, output_qkv, output_loss, output_hidden_states)
         return outputs   # return train=loss or infer=prediction scores
 
     @staticmethod
