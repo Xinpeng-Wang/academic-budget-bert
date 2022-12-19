@@ -26,9 +26,33 @@ def data_aug(batch):
             batch[2][i,positions[i,:]]=1
     return batch
 
-def hidden_mse_learn():
+# def hidden_mse_learn():
     
-    return loss
+#     return loss
+def att_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
+    #TODO: 把这个fp16 32， 正规化，以及看amp方案
+    loss_att = 0.
+    loss_value = 0.
+
+    batch_size, num_head, length, dk = student_qkv[0][2].shape
+    dk_sqrt = math.sqrt(dk)
+    layer_selection = [int(item) for item in layer_selection.split(',')]
+
+    new_teacher_atts = [teacher_atts[i] for i in layer_selection]
+    if len(layer_selection) == 1: 
+        student_atts = [student_atts[-1]]
+    #TODO: change to softmax and log 
+    for student_att, teacher_att in zip(student_atts, new_teacher_atts):
+        # batch_size, head_num, lenght = student_att.shape[0], student_att.shape[1], student_att.shape[2]
+        # student_att_logsoft = student_att.log_softmax(dim=3)
+        student_att_soft = F.softmax(student_att, dim=-1)
+        student_att_logsoft = torch.clamp(student_att_soft, 1e-7, 1).log()
+        teacher_att_soft = teacher_att.softmax(dim=3)
+        loss_kl_tmp = F.kl_div(student_att_logsoft, teacher_att_soft, reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
+        # loss_kl_tmp = F.kl_div(student_att_logsoft.to(torch.float32), teacher_att_soft.to(torch.float32), reduction='sum')/ (batch_size * num_head * length) #, reduction='batchmean', log_target=True)
+        # loss_kl_tmp = F.mse_loss(student_att, teacher_att)
+        loss_att += loss_kl_tmp
+    return loss_att
 
 def att_val_kl(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_selection):
     #TODO: 把这个fp16 32， 正规化，以及看amp方案
@@ -137,15 +161,27 @@ def minilm_v2(student_atts, student_qkv, teacher_atts, teacher_qkv, layer_select
 
     return  loss_q, loss_k, loss_v
 
+
+def hidden_mse(hidden_student, hidden_teacher, layer_selection):
+    layer_selection = [int(item) for item in layer_selection.split(',')]
+    new_teacher_hidden = [hidden_teacher[i] for i in layer_selection]
+    if len(layer_selection) == 1:
+        new_student_hidden =  [hidden_student[-1]]
+    for student_hidd, teacher_hidd in zip(new_student_hidden, new_teacher_hidden):
+        loss_tmp = F.mse_loss(student_hidd, teacher_hidd)
+        loss_hidden = loss_tmp
+    return loss_hidden
+
 def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False):
     log = 'eval' if eval else 'train'
     if args.aug and not eval:
         batch = data_aug(batch)
     with torch.no_grad():
-        attentions_teacher, qkv_teacher, prediction_score_teacher = \
-                teacher(batch, output_attentions=True, output_qkv=True, output_loss=False)
-    attentions_st, qkv_st, prediction_score_st = \
-            student.forward(batch, output_attentions=True, output_qkv=True, output_loss=False)
+        attentions_teacher, qkv_teacher, hidden_teacher, prediction_score_teacher = \
+                teacher(batch, output_attentions=True, output_qkv=True, output_loss=False, output_hidden_states=True)
+    attentions_st, qkv_st, hidden_student, prediction_score_st = \
+            student.forward(batch, output_attentions=True, output_qkv=True, output_loss=False, output_hidden_states=True)
+
     if args.method == 'att_val_og':
         loss_att, loss_val = \
             att_val_kl(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
@@ -154,16 +190,25 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
             wandb.log({f"{log}/loss": total_loss}, step=global_step)
             wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
             wandb.log({f"{log}/loss_val": loss_val}, step=global_step)
+
+    elif args.method == 'att_kl':
+        loss_att = \
+            att_kl(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
+        total_loss = loss_att
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
+
     elif args.method == 'minilm_v2':
         loss_q, loss_k, loss_v = \
             minilm_v2(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
         total_loss = loss_q + loss_k + loss_v        
-        
         if master_process(args):
             wandb.log({f"{log}/loss": total_loss}, step=global_step)
             wandb.log({f"{log}/loss_q": loss_q}, step=global_step)
             wandb.log({f"{log}/loss_k": loss_k}, step=global_step)
             wandb.log({f"{log}/loss_v": loss_v}, step=global_step)
+
     elif args.method == 'pear_col':
         inter_token_1, inter_token_2, inter_head, inter_sentence = dist_att.forward(attentions_teacher[-1], attentions_st[-1])
         total_loss = inter_token_1 + inter_token_2 + inter_head + inter_sentence
@@ -173,6 +218,7 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
             wandb.log({f"{log}/inter_token_2": inter_token_2}, step=global_step)
             wandb.log({f"{log}/inter_head": inter_head}, step=global_step)
             wandb.log({f"{log}/inter_sentence": inter_sentence}, step=global_step)
+            
     elif args.method == 'att_mse':
         loss_att= \
             att_mse(attentions_st, attentions_teacher, args.layer_selection)
@@ -180,7 +226,17 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
         if master_process(args):
             wandb.log({f"{log}/loss": total_loss}, step=global_step)
             wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
+
+    elif args.method == 'hidden_mse':
+        loss_hidden = \
+            hidden_mse(hidden_student, hidden_teacher, args.layer_selection)
+        total_loss = loss_hidden
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_hidden": loss_hidden}, step=global_step)
     return total_loss
+
+
 
 
 def twostage(teacher, student,args, batch, time_diff, global_step, wandb, eval=False):
