@@ -56,7 +56,7 @@ from torch.utils.data.sampler import RandomSampler
 from tqdm import tqdm
 from transformers import HfArgumentParser
 
-from methods.feature_distill import att_val_kl, att_val_frame, twostage
+from methods.feature_distill import att_val_kl, att_val_frame, twostage, HiddenMSECombine
 # from clearml import Task
 # from clearml import Logger as cl_logger
 import argparse
@@ -190,6 +190,14 @@ def train(
     eval_loss = None
     scale_counter_at_1 = 0
 
+    if args.method == 'hidden_mse_combine':
+        projector = HiddenMSECombine()
+        projector.cuda()
+        if args.fp16:
+            projector.to(dtype=torch.float16)
+    else:
+        projector = None
+
     for batch_index_number, batch_index in enumerate(tqdm(dataset_iterator, smoothing=1)):
 
         if batch_index_number > args.max_steps_per_epoch:
@@ -207,7 +215,7 @@ def train(
             batch = tuple(t.to(args.device) for t in batch)  # Move to GPU
             
             if args.method == 'att_val_og' or 'minilm_v2':
-                total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb)
+                total_loss = att_val_frame(teacher, model, args, batch, global_step, wandb, projector)
                 
             if args.method == 'att_val_two_stage':
                 time_diff = get_time_diff_hours(get_now(), args.exp_start_marker)
@@ -673,7 +681,7 @@ def setup_wandb(args, model, resume_id=None):
                 id=resume_id,
             )
         else:
-            wandb.init(project=args.project_name, group=args.job_name, dir="wandb")
+            wandb.init(project=args.project_name, group=args.job_name, dir="training-out/wandb")
         wandb.config.update(args, allow_val_change=True)
         wandb.watch(model)
     else:

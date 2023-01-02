@@ -6,6 +6,7 @@ from pretraining.utils import master_process
 from .pear_loss import Dist_att
 import random
 import numpy as np
+from torch import nn
 dist_att = Dist_att()
 
 def data_aug(batch):
@@ -172,7 +173,40 @@ def hidden_mse(hidden_student, hidden_teacher, layer_selection):
         loss_hidden = loss_tmp
     return loss_hidden
 
-def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False):
+
+
+
+
+
+
+def hidden_mse_cls(hidden_student, hidden_teacher, layer_selection):
+    layer_selection = [int(item) for item in layer_selection.split(',')]
+    new_teacher_hidden = [hidden_teacher[i].transpose(0,1)[:,0] for i in layer_selection]
+    hidden_student = [rep.transpose(0,1)[:,0] for rep in hidden_student]
+    if len(layer_selection) == 1:
+        new_student_hidden =  [hidden_student[-1]]
+    for student_hidd, teacher_hidd in zip(new_student_hidden, new_teacher_hidden):
+        loss_tmp = F.mse_loss(student_hidd, teacher_hidd)
+        loss_hidden = loss_tmp
+    return loss_hidden
+
+
+class HiddenMSECombine(nn.Module):
+    def __init__(self, inputSize=9216, outputSize=4608):
+        super(HiddenMSECombine, self).__init__()
+        self.linear = torch.nn.Linear(inputSize, outputSize)
+    def forward(self, hidden_student, hidden_teacher, layer_selection):
+            # layer_selection = [int(item) for item in layer_selection.split(',')]
+        new_student_hidden = torch.cat([t.transpose(0,1) for t in hidden_student], dim=2)
+        new_teacher_hidden = torch.cat([t.transpose(0,1) for t in hidden_teacher], dim=2)
+        projected_teacher = self.linear(new_teacher_hidden)
+        loss_hidden = F.mse_loss(new_student_hidden, projected_teacher)
+
+        return loss_hidden
+
+
+
+def att_val_frame(teacher, student, args, batch, global_step, wandb, projector=None, eval=False):
     log = 'eval' if eval else 'train'
     if args.aug and not eval:
         batch = data_aug(batch)
@@ -182,7 +216,44 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
     attentions_st, qkv_st, hidden_student, prediction_score_st = \
             student.forward(batch, output_attentions=True, output_qkv=True, output_loss=False, output_hidden_states=True)
 
-    if args.method == 'att_val_og':
+
+    if args.method == 'att_mse_hidden_mse':
+        loss_att= \
+            att_mse(attentions_st, attentions_teacher, args.layer_selection)
+        loss_hidden = \
+            hidden_mse(hidden_student, hidden_teacher, args.layer_selection)
+        total_loss = loss_att + loss_hidden
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
+            wandb.log({f"{log}/loss_hidden": loss_hidden}, step=global_step)
+    elif args.method == 'hidden_mse_combine':
+        loss_hidden = \
+            projector.forward(hidden_student, hidden_teacher, args.layer_selection)
+        total_loss = loss_hidden
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_hidden": loss_hidden}, step=global_step)
+    elif args.method == 'hidden_cls':
+        loss_hidden = \
+            hidden_mse_cls(hidden_student, hidden_teacher, args.layer_selection)
+        total_loss = loss_hidden
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_hidden": loss_hidden}, step=global_step)
+
+    elif args.method == 'att_kl_hidden_mse':
+        loss_att = \
+            att_kl(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
+        loss_hidden = \
+            hidden_mse(hidden_student, hidden_teacher, args.layer_selection)
+        total_loss = loss_att + loss_hidden
+        if master_process(args):
+            wandb.log({f"{log}/loss": total_loss}, step=global_step)
+            wandb.log({f"{log}/loss_att": loss_att}, step=global_step)
+            wandb.log({f"{log}/loss_hidden": loss_hidden}, step=global_step)
+            
+    elif args.method == 'att_val_og':
         loss_att, loss_val = \
             att_val_kl(attentions_st, qkv_st, attentions_teacher, qkv_teacher, args.layer_selection)
         total_loss = loss_att + loss_val
@@ -235,6 +306,8 @@ def att_val_frame(teacher, student, args, batch, global_step, wandb, eval=False)
             wandb.log({f"{log}/loss": total_loss}, step=global_step)
             wandb.log({f"{log}/loss_hidden": loss_hidden}, step=global_step)
     return total_loss
+
+
 
 
 
