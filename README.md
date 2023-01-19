@@ -1,9 +1,9 @@
-# Training BERT with Compute/Time (Academic) Budget
+<!-- # Training BERT with Compute/Time (Academic) Budget
 
 This repository contains scripts for pre-training and finetuning BERT-like models with limited time and compute budget.
 The code is based on the work presented in the following paper:
 
-Peter Izsak, Moshe Berchansky, Omer Levy, [How to Train BERT with an Academic Budget](https://aclanthology.org/2021.emnlp-main.831.pdf) (EMNLP 2021).
+Peter Izsak, Moshe Berchansky, Omer Levy, [How to Train BERT with an Academic Budget](https://aclanthology.org/2021.emnlp-main.831.pdf) (EMNLP 2021). -->
 
 ## Installation
 
@@ -32,7 +32,7 @@ For all possible pretraining arguments see: `python run_pretraining.py -h`
 
 We highly suggest reviewing the various [training features](#time-based-training) we provide within the library.
 
-##### Example for training with the best configuration presented in our paper (24-layers/1024H/time-based learning rate schedule/fp16):
+<!-- ##### Example for training with the best configuration presented in our paper (24-layers/1024H/time-based learning rate schedule/fp16): -->
 
 ```bash
 deepspeed run_pretraining.py \
@@ -81,7 +81,7 @@ deepspeed run_pretraining.py \
   --fp16
 ```
 
-### Time-based Training
+<!-- ### Time-based Training
 
 Pretraining can be limited to a time-based value by defining `--total_training_time=24.0` (24 hours for example).
 
@@ -110,7 +110,7 @@ Enable validation while pre-training with `--do_validation`
 
 Control the number of epochs between validation runs with `--validation_epochs=<num>`
 
-To control the amount of validation runs in the beginning and end (running more that `validation_epochs`) use `validation_begin_proportion` and `validation_end_proportion` to specify the proportion of time and, `validation_epochs_begin` and `validation_epochs_end` to control the custom values accordingly. 
+To control the amount of validation runs in the beginning and end (running more that `validation_epochs`) use `validation_begin_proportion` and `validation_end_proportion` to specify the proportion of time and, `validation_epochs_begin` and `validation_epochs_end` to control the custom values accordingly.  -->
 
 ### Mixed Precision Training
 
@@ -145,7 +145,7 @@ python run_glue.py \
   --lr_scheduler_type polynomial \
   --warmup_steps 50
 ```
-
+<!-- 
 
 ## Generating Pretraining Commands
 
@@ -198,4 +198,4 @@ If you find this paper or this code useful, please cite this paper:
     url = "https://aclanthology.org/2021.emnlp-main.831",
 }
 
-```
+``` -->
